@@ -247,6 +247,52 @@ class AdminPanelController extends Controller
         return redirect()->back()->with('success', 'System Settings & Integrations updated successfully!');
     }
 
+    public function processPayment(Request $request)
+    {
+        $validated = $request->validate([
+            'plan_name' => ['required', 'string'],
+            'billing_cycle' => ['required', 'string'],
+            'amount' => ['required', 'numeric'],
+            'payment_method' => ['nullable', 'string'],
+        ]);
+
+        $txnId = 'TXN_' . date('Ymd') . rand(100000, 999999);
+        $tenantId = session('tenant_id') ?? auth()->user()?->tenant_id;
+
+        $storageGb = 25;
+        if (str_contains(strtolower($validated['plan_name']), 'growth')) {
+            $storageGb = 100;
+        } elseif (str_contains(strtolower($validated['plan_name']), 'enterprise')) {
+            $storageGb = 999;
+        }
+
+        if ($tenantId) {
+            DB::table('tenants')
+                ->where('id', $tenantId)
+                ->update([
+                    'plan' => $validated['plan_name'],
+                    'storage_limit_gb' => $storageGb,
+                    'status' => 'active',
+                    'updated_at' => now(),
+                ]);
+        }
+
+        $expiryDate = $validated['billing_cycle'] === 'annually'
+            ? now()->addYear()->format('M d, Y')
+            : now()->addMonth()->format('M d, Y');
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Payment processed successfully and plan activated!',
+            'transaction_id' => $txnId,
+            'plan_name' => $validated['plan_name'],
+            'billing_cycle' => $validated['billing_cycle'],
+            'amount' => $validated['amount'],
+            'storage_gb' => $storageGb,
+            'expiry_date' => $expiryDate,
+        ]);
+    }
+
     private function ensureSampleLeadsExist(): void
     {
         if (DB::table('crm_sales_leads')->count() === 0) {

@@ -46,6 +46,7 @@ Route::prefix('admin')->middleware(EnsureMasterAdmin::class)->name('admin.')->gr
     Route::get('/paid-users', [AdminPanelController::class, 'paidUsers'])->name('paid-users.index');
     Route::get('/settings', [AdminPanelController::class, 'settings'])->name('settings.index');
     Route::post('/settings', [AdminPanelController::class, 'updateSettings'])->name('settings.update');
+    Route::post('/subscription/process-payment', [AdminPanelController::class, 'processPayment'])->name('subscription.process-payment');
 
     // Admin prefixed module routes
     Route::get('/broadcast-message', [BroadcastMessageController::class, 'index'])->name('broadcast.index');
