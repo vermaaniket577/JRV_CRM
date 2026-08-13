@@ -115,6 +115,36 @@ class IndustrySeeder extends Seeder
     private function getIndustries(): array
     {
         return [
+            // ========== MATRIMONIAL & MATCHMAKING SERVICES ==========
+            [
+                'name' => 'Matrimonial & Matchmaking',
+                'slug' => 'matrimonial',
+                'icon' => '💍',
+                'description' => 'Matrimonial bureaus, community matchmaking, marriage bureau, Jain/Hindu/Sikh matrimony',
+                'color' => 'red',
+                'business_types' => [
+                    ['name' => 'Matrimonial Bureau', 'slug' => 'matrimonial-bureau', 'description' => 'Personalized matchmaking bureau'],
+                    ['name' => 'Community Matchmaking', 'slug' => 'community-matchmaking', 'description' => 'Cast / Community specific matrimony'],
+                    ['name' => 'VIP / Elite Matchmaking', 'slug' => 'vip-matchmaking', 'description' => 'High profile & HNIs matchmaking'],
+                    ['name' => 'Online Marriage Portal', 'slug' => 'online-marriage-portal', 'description' => 'Digital matrimony platform'],
+                ],
+                'modules' => [
+                    ['key' => 'biodata', 'label' => 'Biodata Directory', 'icon' => '📄', 'route' => '/matrimonial'],
+                    ['key' => 'verified_members', 'label' => 'Verified Profiles', 'icon' => 'ShieldCheckIcon', 'route' => '/matrimonial'],
+                    ['key' => 'shortlist', 'label' => 'Shortlist & Matches', 'icon' => 'HeartIcon', 'route' => '/matrimonial'],
+                ],
+                'pipeline' => [
+                    'name' => 'Matrimonial Match Pipeline',
+                    'stages' => [
+                        ['name' => 'New Registration', 'probability' => 20, 'type' => 'open'],
+                        ['name' => 'Biodata Received', 'probability' => 40, 'type' => 'open'],
+                        ['name' => 'Verification Done', 'probability' => 60, 'type' => 'open'],
+                        ['name' => 'Match Shortlisted', 'probability' => 80, 'type' => 'open'],
+                        ['name' => 'Match Confirmed / Marriage Fixed', 'probability' => 100, 'type' => 'won'],
+                    ]
+                ]
+            ],
+
             // ========== 1. EDUCATION (FULLY CONFIGURED) ==========
             [
                 'name' => 'Education & Training',
