@@ -7,7 +7,8 @@ import {
   ArrowLeftIcon, 
   CheckIcon,
   UserGroupIcon,
-  RocketLaunchIcon
+  RocketLaunchIcon,
+  MagnifyingGlassIcon
 } from '@heroicons/vue/24/outline';
 
 const props = defineProps({
@@ -18,12 +19,22 @@ const currentStep = ref(1);
 const selectedIndustry = ref(null);
 const businessTypes = ref([]);
 const loadingTypes = ref(false);
+const searchQuery = ref('');
 
 const form = useForm({
   industry_id: null,
   business_type_id: null,
   employee_range: '6–20',
   crm_goals: [],
+});
+
+const filteredIndustries = computed(() => {
+  if (!searchQuery.value) return props.industries || [];
+  const q = searchQuery.value.toLowerCase();
+  return (props.industries || []).filter(ind => 
+    ind.name.toLowerCase().includes(q) || 
+    (ind.description && ind.description.toLowerCase().includes(q))
+  );
 });
 
 const teamSizes = [
@@ -85,18 +96,21 @@ const completeOnboarding = () => {
 <template>
   <Head title="Configure Your CRM - Onboarding" />
 
-  <div class="min-h-screen bg-slate-100 text-slate-900 font-sans flex flex-col justify-between p-6 relative overflow-hidden">
+  <div class="min-h-screen bg-slate-100 text-slate-900 font-sans flex flex-col justify-between p-4 sm:p-8 relative overflow-hidden">
     <!-- Background Soft Red Ambient Glows -->
     <div class="absolute top-1/4 left-1/3 -translate-x-1/2 w-[600px] h-[600px] bg-red-500/10 rounded-full blur-3xl pointer-events-none"></div>
     <div class="absolute bottom-1/4 right-1/4 w-[500px] h-[500px] bg-red-400/10 rounded-full blur-3xl pointer-events-none"></div>
 
     <!-- Header & Step Indicator -->
-    <header class="max-w-5xl mx-auto w-full pt-4 flex items-center justify-between z-10">
-      <div class="flex items-center gap-2">
-        <div class="w-10 h-10 rounded-2xl bg-red-600 flex items-center justify-center text-white font-black text-xl shadow-lg shadow-red-600/30">
+    <header class="max-w-6xl mx-auto w-full pt-2 flex items-center justify-between z-10">
+      <div class="flex items-center gap-2.5">
+        <div class="w-11 h-11 rounded-2xl bg-red-600 flex items-center justify-center text-white font-black text-xl shadow-md shadow-red-600/30">
           ⚡
         </div>
-        <span class="font-extrabold text-xl tracking-tight text-slate-900">Multi-Sector CRM</span>
+        <div>
+          <span class="font-black text-xl tracking-tight text-slate-900">Multi-Sector CRM</span>
+          <p class="text-[10px] font-extrabold text-slate-500 uppercase tracking-widest">Dynamic Engine Configurator</p>
+        </div>
       </div>
 
       <!-- Step Counter -->
@@ -109,43 +123,62 @@ const completeOnboarding = () => {
             step === currentStep ? 'w-10 bg-red-600 shadow-md shadow-red-600/40' : step < currentStep ? 'w-4 bg-emerald-500' : 'w-4 bg-slate-300'
           ]"
         ></div>
-        <span class="text-xs font-bold text-slate-500 ml-2">Step {{ currentStep }} of 4</span>
+        <span class="text-xs font-extrabold text-slate-700 ml-2">Step {{ currentStep }} of 4</span>
       </div>
     </header>
 
     <!-- Main Content Step Containers -->
-    <main class="max-w-5xl mx-auto w-full my-auto py-8 z-10">
+    <main class="max-w-6xl mx-auto w-full my-auto py-6 z-10">
       
       <!-- STEP 1: Select Industry Sector -->
       <div v-if="currentStep === 1" class="space-y-6">
-        <div class="text-center max-w-2xl mx-auto space-y-2">
-          <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-red-50 border border-red-200 text-xs font-extrabold text-red-700">
+        <div class="text-center max-w-3xl mx-auto space-y-2">
+          <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-red-50 border border-red-200 text-xs font-extrabold text-red-700 shadow-2xs">
             <SparklesIcon class="w-4 h-4 text-red-600" />
-            <span>Step 1: Choose Sector</span>
+            <span>Step 1 of 4 • Choose Sector Engine</span>
           </div>
           <h2 class="text-3xl sm:text-4xl font-black text-slate-900 tracking-tight">What type of business do you operate?</h2>
-          <p class="text-slate-500 text-sm font-medium">Select your industry. Our engine will dynamically configure your modules, pipelines, fields, and dashboard.</p>
+          <p class="text-slate-500 text-xs sm:text-sm font-medium leading-relaxed">
+            Select your industry. Our engine will dynamically configure your pipelines, custom fields, automation workflows, and analytics dashboard.
+          </p>
+
+          <!-- Search Bar -->
+          <div class="max-w-md mx-auto pt-2">
+            <div class="relative">
+              <MagnifyingGlassIcon class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <input 
+                v-model="searchQuery" 
+                type="text" 
+                placeholder="Search Real Estate, Healthcare, Education, Law..." 
+                class="w-full bg-white border border-slate-300 rounded-2xl pl-10 pr-4 py-2 text-xs font-bold text-slate-900 focus:outline-none focus:border-red-500 shadow-2xs"
+              />
+            </div>
+          </div>
         </div>
 
-        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 max-h-[520px] overflow-y-auto pr-2 custom-scrollbar">
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 max-h-[540px] overflow-y-auto pr-2 custom-scrollbar">
           <div
-            v-for="ind in industries"
+            v-for="ind in filteredIndustries"
             :key="ind.id"
             @click="selectIndustry(ind)"
             :class="[
-              'p-5 rounded-2xl border bg-white hover:bg-red-50/50 border-slate-200 hover:border-red-500 cursor-pointer transition-all duration-200 group flex flex-col justify-between space-y-3 shadow-xs hover:shadow-md',
-              form.industry_id === ind.id ? 'border-red-500 bg-red-50/70 shadow-red-500/10' : ''
+              'p-5 rounded-2xl border transition-all duration-200 group flex flex-col justify-between space-y-3 cursor-pointer shadow-2xs hover:shadow-lg hover:-translate-y-0.5',
+              form.industry_id === ind.id 
+                ? 'border-red-500 bg-gradient-to-br from-red-50/60 via-white to-white ring-2 ring-red-500 shadow-md shadow-red-500/10' 
+                : 'bg-white border-slate-200 hover:border-red-400 hover:bg-red-50/20'
             ]"
           >
             <div class="flex items-center justify-between">
-              <span class="text-3xl group-hover:scale-110 transition-transform">{{ ind.icon }}</span>
-              <span class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 group-hover:bg-red-100 group-hover:text-red-700">
-                Sector
+              <div class="w-11 h-11 rounded-2xl bg-slate-100/80 border border-slate-200 text-2xl flex items-center justify-center group-hover:scale-110 group-hover:bg-red-50 group-hover:border-red-200 transition-all shadow-2xs">
+                {{ ind.icon }}
+              </div>
+              <span class="text-[9px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-500 border border-slate-200/60 group-hover:bg-red-100 group-hover:text-red-700 group-hover:border-red-200 transition-colors">
+                SECTOR
               </span>
             </div>
             <div>
               <h3 class="font-extrabold text-base text-slate-900 group-hover:text-red-600 transition-colors">{{ ind.name }}</h3>
-              <p class="text-xs text-slate-500 line-clamp-2 mt-1 font-medium">{{ ind.description }}</p>
+              <p class="text-xs text-slate-500 line-clamp-2 mt-1 font-medium leading-relaxed">{{ ind.description }}</p>
             </div>
           </div>
         </div>
@@ -154,7 +187,7 @@ const completeOnboarding = () => {
       <!-- STEP 2: Select Specific Business Sub-Type -->
       <div v-if="currentStep === 2" class="space-y-6 max-w-3xl mx-auto">
         <div class="text-center space-y-2">
-          <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-red-50 border border-red-200 text-xs font-extrabold text-red-700">
+          <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-red-50 border border-red-200 text-xs font-extrabold text-red-700 shadow-2xs">
             <span>{{ selectedIndustry?.icon }} {{ selectedIndustry?.name }}</span>
           </div>
           <h2 class="text-3xl font-black text-slate-900 tracking-tight">What is your specific business type?</h2>
@@ -172,7 +205,7 @@ const completeOnboarding = () => {
             @click="form.business_type_id = bt.id"
             :class="[
               'p-4 rounded-2xl border bg-white hover:bg-slate-50 border-slate-200 cursor-pointer transition-all flex items-center justify-between shadow-xs',
-              form.business_type_id === bt.id ? 'border-red-500 bg-red-50/60' : ''
+              form.business_type_id === bt.id ? 'border-red-500 bg-red-50/60 ring-2 ring-red-500' : ''
             ]"
           >
             <div>
@@ -209,7 +242,7 @@ const completeOnboarding = () => {
       <!-- STEP 3: Select Team Size -->
       <div v-if="currentStep === 3" class="space-y-6 max-w-3xl mx-auto">
         <div class="text-center space-y-2">
-          <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-red-50 border border-red-200 text-xs font-extrabold text-red-700">
+          <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-red-50 border border-red-200 text-xs font-extrabold text-red-700 shadow-2xs">
             <UserGroupIcon class="w-4 h-4 text-red-600" />
             <span>Step 3: Organization Scale</span>
           </div>
@@ -224,7 +257,7 @@ const completeOnboarding = () => {
             @click="form.employee_range = ts.id"
             :class="[
               'p-5 rounded-2xl border bg-white hover:bg-slate-50 border-slate-200 cursor-pointer transition-all flex items-center justify-between shadow-xs',
-              form.employee_range === ts.id ? 'border-red-500 bg-red-50/60' : ''
+              form.employee_range === ts.id ? 'border-red-500 bg-red-50/60 ring-2 ring-red-500' : ''
             ]"
           >
             <div>
@@ -261,7 +294,7 @@ const completeOnboarding = () => {
       <!-- STEP 4: Primary CRM Goals (Multi-select) -->
       <div v-if="currentStep === 4" class="space-y-6 max-w-3xl mx-auto">
         <div class="text-center space-y-2">
-          <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-red-50 border border-red-200 text-xs font-extrabold text-red-700">
+          <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-red-50 border border-red-200 text-xs font-extrabold text-red-700 shadow-2xs">
             <SparklesIcon class="w-4 h-4 text-red-600" />
             <span>Step 4: Objectives</span>
           </div>
@@ -276,7 +309,7 @@ const completeOnboarding = () => {
             @click="toggleGoal(goal.id)"
             :class="[
               'p-4 rounded-2xl border bg-white hover:bg-slate-50 border-slate-200 cursor-pointer transition-all flex items-center justify-between gap-2 shadow-xs',
-              form.crm_goals.includes(goal.id) ? 'border-red-500 bg-red-50/60' : ''
+              form.crm_goals.includes(goal.id) ? 'border-red-500 bg-red-50/60 ring-2 ring-red-500' : ''
             ]"
           >
             <div class="flex items-center gap-2.5">
@@ -314,7 +347,7 @@ const completeOnboarding = () => {
     </main>
 
     <!-- Footer Status -->
-    <footer class="max-w-5xl mx-auto w-full pb-4 text-center text-xs text-slate-500 font-medium z-10">
+    <footer class="max-w-6xl mx-auto w-full pb-2 text-center text-xs text-slate-500 font-medium z-10">
       Multi-Sector Dynamic Engine • Automatic Module & Pipeline Provisioning
     </footer>
   </div>
