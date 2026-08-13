@@ -8,6 +8,17 @@ export default defineConfig({
         host: '127.0.0.1',
         port: 5173,
     },
+    build: {
+        chunkSizeWarningLimit: 1000,
+        rollupOptions: {
+            output: {
+                manualChunks: {
+                    'vendor-vue': ['vue', '@inertiajs/vue3'],
+                    'vendor-icons': ['@heroicons/vue/24/outline'],
+                },
+            },
+        },
+    },
     plugins: [
         laravel({
             input: ['resources/js/app.js'],

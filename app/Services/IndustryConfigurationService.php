@@ -47,15 +47,17 @@ class IndustryConfigurationService
         }
 
         foreach ($modules as $index => $module) {
-            NavigationItem::create([
-                'tenant_id' => $tenant->id,
-                'key' => is_array($module) ? $module['module_key'] : $module->module_key,
-                'label' => is_array($module) ? $module['label'] : $module->label,
-                'icon' => is_array($module) ? $module['icon'] : $module->icon,
-                'route' => is_array($module) ? $module['route'] : $module->route,
-                'display_order' => $index + 1,
-                'is_enabled' => true,
-            ]);
+            $modKey = is_array($module) ? $module['module_key'] : $module->module_key;
+            NavigationItem::updateOrCreate(
+                ['tenant_id' => $tenant->id, 'key' => $modKey],
+                [
+                    'label' => is_array($module) ? $module['label'] : $module->label,
+                    'icon' => is_array($module) ? $module['icon'] : $module->icon,
+                    'route' => is_array($module) ? $module['route'] : $module->route,
+                    'display_order' => $index + 1,
+                    'is_enabled' => true,
+                ]
+            );
         }
     }
 
