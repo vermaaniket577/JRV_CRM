@@ -4,7 +4,13 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>Multi-Tenant SaaS CRM</title>
+    <title>JRV CRM - Multi-Sector SaaS Platform</title>
+
+    <!-- Brand Favicon with Cache Busting -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=2">
+    <link rel="alternate icon" type="image/x-icon" href="/favicon.svg?v=2">
+    <link rel="shortcut icon" href="/favicon.svg?v=2">
+
     <script src="https://cdn.tailwindcss.com"></script>
     @vite(['resources/js/app.js'])
     @inertiaHead
