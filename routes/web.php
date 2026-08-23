@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\v1\PublicMemberApiController;
+use App\Http\Controllers\Api\v1\WebsiteIntegrationApiController;
 use App\Http\Controllers\AppDashboardController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\RegisterController;
@@ -9,6 +10,7 @@ use App\Http\Controllers\BroadcastMessageController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DealController;
 use App\Http\Controllers\EmbedFormController;
+use App\Http\Controllers\EmbedPaymentController;
 use App\Http\Controllers\EmployeeController;
 use App\Http\Controllers\GlobalSearchController;
 use App\Http\Controllers\MemberController;
@@ -16,6 +18,8 @@ use App\Http\Controllers\MemberVerificationController;
 use App\Http\Controllers\OnlineUserController;
 use App\Http\Controllers\Onboarding\OnboardingController;
 use App\Http\Controllers\PadhadhikariController;
+use App\Http\Controllers\PaymentPlanController;
+use App\Http\Controllers\PropertyController;
 use App\Http\Controllers\StaffRecruitmentController;
 use App\Http\Controllers\TaskController;
 use App\Http\Controllers\TaskDashboardController;
@@ -26,8 +30,11 @@ use App\Http\Controllers\CrmSalesPanelController;
 use App\Http\Controllers\CrmSellingPanelController;
 use App\Http\Controllers\AdminPanelController;
 use App\Http\Controllers\AdminLoginController;
-use App\Http\Middleware\EnsureMasterAdmin;
+use App\Http\Controllers\Tenant\TenantDatabaseManagerController;
 use App\Http\Controllers\Tenant\WebsiteIntegrationController;
+use App\Http\Controllers\SessionCookieController;
+use App\Http\Controllers\SystemSettingController;
+use App\Http\Middleware\EnsureMasterAdmin;
 use Illuminate\Support\Facades\Route;
 
 // Master Admin Authentication Routes
@@ -84,29 +91,68 @@ Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
 Route::middleware('auth')->prefix('onboarding')->name('onboarding.')->group(function () {
     Route::get('/', [OnboardingController::class, 'index'])->name('index');
     Route::get('/business-types', [OnboardingController::class, 'getBusinessTypes'])->name('business-types');
+    Route::get('/industry-columns', [OnboardingController::class, 'getIndustryColumns'])->name('industry-columns');
     Route::post('/complete', [OnboardingController::class, 'complete'])->name('complete');
 });
+
+use App\Http\Controllers\RazorpayController;
+
+// Dynamic Tenant CRM Database & Custom Columns Management Routes
+Route::middleware('auth')->group(function () {
+    Route::get('/tenant/crm-records', [TenantDatabaseManagerController::class, 'index'])->name('tenant.crm-records.index');
+    Route::post('/tenant/crm-records', [TenantDatabaseManagerController::class, 'storeRecord'])->name('tenant.crm-records.store');
+    Route::get('/tenant/crm-records/export', [TenantDatabaseManagerController::class, 'exportCsv'])->name('tenant.crm-records.export');
+    Route::post('/tenant/database/columns', [TenantDatabaseManagerController::class, 'addColumn'])->name('tenant.database.columns.add');
+    Route::delete('/tenant/database/columns/{column}', [TenantDatabaseManagerController::class, 'deleteColumn'])->name('tenant.database.columns.delete');
+
+    // Razorpay Payment Gateway Routes
+    Route::post('/razorpay/create-order', [RazorpayController::class, 'createOrder'])->name('razorpay.create-order');
+    Route::post('/razorpay/verify-payment', [RazorpayController::class, 'verifyPayment'])->name('razorpay.verify-payment');
+});
+
+// Razorpay Webhook Public Endpoint
+Route::post('/api/v1/razorpay/webhook', [RazorpayController::class, 'webhook']);
 
 Route::get('/', AppDashboardController::class)->name('home');
 Route::get('/app', AppDashboardController::class)->name('app.dashboard');
 Route::get('/dashboard', DashboardController::class)->name('dashboard');
 Route::get('/crm-overview', DashboardController::class)->name('crm.overview');
+Route::get('/global-search', GlobalSearchController::class)->name('global-search');
 
 Route::get('/task-dashboard', TaskDashboardController::class)->name('task-dashboard');
 
 Route::get('/employee-management', EmployeeController::class)->name('employee-management');
+Route::get('/employee-management/export', [EmployeeController::class, 'export'])->name('employee-management.export');
+Route::get('/employee-management/sample-csv', [EmployeeController::class, 'downloadSample'])->name('employee-management.sample');
+Route::post('/employee-management/import', [EmployeeController::class, 'import'])->name('employee-management.import');
 Route::post('/employee-management', [EmployeeController::class, 'store'])->name('employee-management.store');
 Route::put('/employee-management/{employee}', [EmployeeController::class, 'update'])->name('employee-management.update');
 Route::delete('/employee-management/{employee}', [EmployeeController::class, 'destroy'])->name('employee-management.destroy');
+
+// Payment Plans & Customer Invoices Management (User Panel)
+Route::resource('payment-plans', PaymentPlanController::class);
+Route::post('/payment-plans/installments/{installment}/mark-paid', [PaymentPlanController::class, 'markInstallmentPaid'])->name('payment-plans.installments.mark-paid');
 
 // Standalone Embed Bio-data Registration Form Routes (For External Website iFrames)
 Route::get('/embed/register', [EmbedFormController::class, 'show'])->name('embed.register');
 Route::post('/embed/register', [EmbedFormController::class, 'store'])->name('embed.store');
 
+// Standalone 1-Click Payment Checkout & Fee Collection Portal
+Route::get('/embed/pay', [EmbedPaymentController::class, 'show'])->name('embed.pay');
+Route::post('/embed/pay', [EmbedPaymentController::class, 'store'])->name('embed.pay.store');
+Route::get('/pay/{tenant?}', [EmbedPaymentController::class, 'show'])->name('public.pay');
+
+// Customer Payment Plan & Invoice Checkout Routes
+Route::get('/pay/plan/{token}', [EmbedPaymentController::class, 'showPlan'])->name('public.pay.plan');
+Route::post('/pay/plan/{token}', [EmbedPaymentController::class, 'submitPlanPayment'])->name('public.pay.plan.submit');
+
 // Public REST API Endpoints (CORS Enabled for Website Integration)
 Route::prefix('api/v1')->group(function () {
     Route::get('/members/search', [PublicMemberApiController::class, 'search']);
     Route::post('/members/register', [PublicMemberApiController::class, 'register']);
+    Route::post('/integration/auto-capture', [WebsiteIntegrationApiController::class, 'autoCapture']);
+    Route::post('/integration/test-ping', [WebsiteIntegrationApiController::class, 'testPing']);
+    Route::get('/integration/download-wordpress-plugin', [WebsiteIntegrationApiController::class, 'downloadWordPressPlugin'])->name('integration.download-plugin');
 });
 
 // Left Sidebar Custom Modules Routes
@@ -134,7 +180,14 @@ Route::prefix('staff-recruitment')->name('recruitment.')->group(function () {
 
 // Matrimonial & Community Directory Bio-Data Routes
 Route::prefix('matrimonial')->name('matrimonial.')->group(function () {
+    Route::get('/', [MemberController::class, 'index'])->name('index');
     Route::get('/directory', [MemberController::class, 'index'])->name('directory');
+    Route::get('/biodata', [MemberController::class, 'index'])->name('biodata');
+    Route::get('/verified', [MemberController::class, 'verified'])->name('verified');
+    Route::get('/shortlist', [MemberController::class, 'shortlistIndex'])->name('shortlist.index');
+    Route::get('/export', [MemberController::class, 'export'])->name('export');
+    Route::get('/sample-csv', [MemberController::class, 'downloadSample'])->name('sample');
+    Route::post('/import', [MemberController::class, 'import'])->name('import');
     Route::post('/members', [MemberController::class, 'store'])->name('members.store');
     Route::post('/members/{member}/verify', [MemberVerificationController::class, 'approve'])->name('members.verify');
     Route::post('/members/{member}/reject', [MemberVerificationController::class, 'reject'])->name('members.reject');
@@ -150,16 +203,76 @@ Route::get('/global-search', GlobalSearchController::class)->name('global-search
 Route::get('/leads', [CrmSalesPanelController::class, 'index'])->name('leads.index');
 Route::get('/contacts', [OnlineUserController::class, 'index'])->name('contacts.index');
 Route::get('/companies', [CrmSellingPanelController::class, 'index'])->name('companies.index');
+
+// Education & Training Modules
+Route::get('/courses', [TenantDatabaseManagerController::class, 'index'])->name('courses.index');
+Route::get('/applications', [TenantDatabaseManagerController::class, 'index'])->name('applications.index');
+Route::get('/admissions', [TenantDatabaseManagerController::class, 'index'])->name('admissions.index');
+Route::get('/counselors', EmployeeController::class)->name('counselors.index');
+Route::get('/fees', [DealController::class, 'index'])->name('fees.index');
+
+// Recruitment & Staffing Modules
+Route::get('/jobs', [StaffRecruitmentController::class, 'index'])->name('jobs.index');
+Route::get('/interviews', TaskDashboardController::class)->name('interviews.index');
+Route::get('/offers', [DealController::class, 'index'])->name('offers.index');
+Route::get('/placements', [DealController::class, 'index'])->name('placements.index');
+
+// Dynamic CRM Directory Hub Aliases
+Route::get('/records', [TenantDatabaseManagerController::class, 'index'])->name('crm.records');
+Route::get('/directory', function () {
+    $user = auth()->user();
+    $tenantId = session('tenant_id') ?? $user?->tenant_id;
+    $tenant = $tenantId ? \App\Models\Tenant::with('industry')->find($tenantId) : null;
+    $industrySlug = $tenant?->industry?->slug ?? \App\Models\TenantSetting::getByKey('industry_slug', 'education', $tenantId);
+
+    if ($industrySlug === 'real-estate') {
+        return redirect()->route('properties.index');
+    }
+    if ($industrySlug === 'matrimonial') {
+        return redirect()->route('matrimonial.directory');
+    }
+    return redirect()->route('tenant.crm-records.index');
+})->name('directory');
+
+Route::get('/{industry}/directory', function ($industry) {
+    if ($industry === 'matrimonial') {
+        return app(MemberController::class)->index(request());
+    }
+    if ($industry === 'real-estate') {
+        return redirect()->route('properties.index');
+    }
+    return redirect()->route('tenant.crm-records.index');
+})->where('industry', '[a-zA-Z0-9_\-]+');
+
+// Real Estate Properties & Rental Listings Routes
+Route::prefix('properties')->name('properties.')->group(function () {
+    Route::get('/', [PropertyController::class, 'index'])->name('index');
+    Route::post('/', [PropertyController::class, 'store'])->name('store');
+    Route::patch('/{property}/status', [PropertyController::class, 'updateStatus'])->name('update-status');
+    Route::get('/export', [PropertyController::class, 'export'])->name('export');
+    Route::get('/sample-csv', [PropertyController::class, 'downloadSample'])->name('sample');
+    Route::post('/import', [PropertyController::class, 'import'])->name('import');
+});
+
+Route::get('/projects', [PropertyController::class, 'index'])->name('projects.index');
+Route::get('/site-visits', TaskDashboardController::class)->name('site-visits.index');
+Route::get('/bookings', [PropertyController::class, 'index'])->name('bookings.index');
+Route::get('/agents', EmployeeController::class)->name('agents.index');
 Route::get('/tasks', TaskDashboardController::class)->name('tasks.index');
 Route::get('/reports', DashboardController::class)->name('reports.index');
 Route::get('/cases', [DealController::class, 'index'])->name('cases.index');
 Route::get('/hearings', TaskDashboardController::class)->name('hearings.index');
 Route::get('/documents', TaskDashboardController::class)->name('documents.index');
-Route::get('/doctors', [EmployeeController::class, 'index'])->name('doctors.index');
+Route::get('/doctors', EmployeeController::class)->name('doctors.index');
 Route::get('/appointments', TaskDashboardController::class)->name('appointments.index');
-Route::get('/departments', [EmployeeController::class, 'index'])->name('departments.index');
+Route::get('/departments', EmployeeController::class)->name('departments.index');
 Route::get('/treatments', [DealController::class, 'index'])->name('treatments.index');
 Route::get('/follow-ups', TaskDashboardController::class)->name('follow-ups.index');
+Route::get('/biodata', [MemberController::class, 'index'])->name('biodata.direct');
+Route::get('/padhadhikari', [PadhadhikariController::class, 'index'])->name('padhadhikari.direct');
+Route::get('/broadcast', [BroadcastMessageController::class, 'index'])->name('broadcast.direct');
+Route::get('/recruitment', [StaffRecruitmentController::class, 'index'])->name('recruitment.direct');
+Route::get('/settings', [SystemSettingController::class, 'index'])->name('settings.direct');
 
 Route::prefix('deals')->name('deals.')->group(function () {
     Route::get('/', [DealController::class, 'index'])->name('index');
@@ -190,3 +303,39 @@ Route::prefix('tenant/settings')->name('tenant.settings.')->group(function () {
     Route::post('/mail/send-direct', [TenantMailSettingController::class, 'sendDirectMail'])->name('mail.send-direct');
     Route::post('/mail/send-test', [TenantMailSettingController::class, 'sendTestMail'])->name('mail.send-test');
 });
+
+// Session & Cookie Management Routes
+Route::prefix('settings/session-cookies')->name('session-cookies.')->group(function () {
+    Route::get('/', [SessionCookieController::class, 'index'])->name('index');
+    Route::post('/consent', [SessionCookieController::class, 'updateConsent'])->name('consent');
+    Route::post('/preferences', [SessionCookieController::class, 'updatePreferences'])->name('preferences');
+    Route::post('/revoke-sessions', [SessionCookieController::class, 'revokeOtherSessions'])->name('revoke-sessions');
+    Route::post('/clear-cookies', [SessionCookieController::class, 'clearCookies'])->name('clear-cookies');
+});
+
+// User Panel CRM System Settings & Website Integration Hub
+Route::prefix('system-settings')->name('system-settings.')->group(function () {
+    Route::get('/', [SystemSettingController::class, 'index'])->name('index');
+    Route::post('/general', [SystemSettingController::class, 'updateGeneral'])->name('general');
+    Route::post('/password', [SystemSettingController::class, 'updatePassword'])->name('password');
+    Route::post('/payments', [SystemSettingController::class, 'updatePayments'])->name('payments');
+    Route::post('/social', [SystemSettingController::class, 'updateSocial'])->name('social');
+});
+
+// Graceful fallback for any undefined or custom module routes (prevents 404 popups)
+Route::fallback(function () {
+    $user = auth()->user();
+    $tenantId = session('tenant_id') ?? $user?->tenant_id;
+    $tenant = $tenantId ? \App\Models\Tenant::with('industry')->find($tenantId) : null;
+    $industrySlug = $tenant?->industry?->slug ?? \App\Models\TenantSetting::getByKey('industry_slug', 'education', $tenantId);
+
+    if ($industrySlug === 'real-estate') {
+        return redirect()->route('properties.index');
+    }
+    if ($industrySlug === 'matrimonial') {
+        return redirect()->route('matrimonial.directory');
+    }
+    return redirect()->route('tenant.crm-records.index');
+});
+
+

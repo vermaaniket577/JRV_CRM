@@ -3,6 +3,7 @@ import { ref, computed } from 'vue';
 import { Head, Link, usePage } from '@inertiajs/vue3';
 import Navbar from '@/Components/Navbar.vue';
 import GlobalSearchModal from '@/Components/GlobalSearchModal.vue';
+import LoginHistoryModal from '@/Components/LoginHistoryModal.vue';
 import { 
   BellIcon, 
   HomeIcon, 
@@ -59,7 +60,31 @@ const props = defineProps({
 const page = usePage();
 const customNavList = computed(() => page.props.custom_nav_list || []);
 const customNav = computed(() => page.props.custom_nav || {});
-const businessSettings = computed(() => page.props.business_settings || { business_name: 'JRV CRM', business_icon: '♥' });
+const businessSettings = computed(() => page.props.business_settings || { business_name: 'JRV CRM', business_icon: '🎓' });
+const tenantIndustry = computed(() => page.props.tenant_industry || { slug: 'education', name: 'Education & Training' });
+
+const isMatrimonial = computed(() => tenantIndustry.value?.slug === 'matrimonial');
+const isRealEstate = computed(() => tenantIndustry.value?.slug === 'real-estate');
+const isEducation = computed(() => tenantIndustry.value?.slug === 'education');
+
+const primaryActionButtonLabel = computed(() => {
+  if (isMatrimonial.value) return '+ Add Bio-Data Profile';
+  if (isRealEstate.value) return '+ Add Property / Rental';
+  if (isEducation.value) return '+ Add Admission / Student';
+  return '+ Add CRM Lead';
+});
+
+const primaryActionRoute = computed(() => {
+  if (isMatrimonial.value) return '/matrimonial/directory';
+  if (isRealEstate.value) return '/properties';
+  return '/tenant/crm-records';
+});
+
+const myWorkRoute = computed(() => {
+  if (isMatrimonial.value) return '/matrimonial/directory';
+  if (isRealEstate.value) return '/properties';
+  return '/tenant/crm-records';
+});
 
 const resolveIcon = (iconName) => iconMap[iconName] || LinkIcon;
 
@@ -70,10 +95,11 @@ const isCurrentRoute = (path) => {
 };
 
 const isSearchOpen = ref(false);
+const isLoginHistoryOpen = ref(false);
 </script>
 
 <template>
-  <Head title="App Dashboard - JRV CRM" />
+  <Head :title="`${businessSettings.business_name || 'Dashboard'} - ${tenantIndustry?.name || 'CRM SaaS Engine'}`" />
 
   <div class="min-h-screen bg-slate-100 flex font-sans text-slate-900">
     <!-- Navbar (Fixed Left Vertical Sidebar) -->
@@ -81,19 +107,17 @@ const isSearchOpen = ref(false);
 
     <!-- Main Content Area -->
     <div class="flex-1 flex flex-col min-w-0">
-      <!-- Top Action Bar (Red Pill Buttons) -->
-      <header class="bg-white border-b border-slate-200 px-6 py-3.5 flex flex-wrap items-center justify-between gap-3 shadow-xs">
-        <div class="flex flex-wrap items-center gap-2">
-          <button class="px-4 py-1.5 bg-red-600 hover:bg-red-700 text-white font-extrabold text-xs rounded-xl shadow-xs transition-all">
-            My Work
-          </button>
-          <button class="px-4 py-1.5 bg-red-600 hover:bg-red-700 text-white font-extrabold text-xs rounded-xl shadow-xs transition-all">
-            Login History
-          </button>
-          <button class="px-4 py-1.5 bg-red-600 hover:bg-red-700 text-white font-extrabold text-xs rounded-xl shadow-xs transition-all">
-            My Task
-          </button>
-          <Link href="/tenant/settings/navigation" class="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs rounded-xl shadow-xs transition-all flex items-center gap-1.5">
+      <!-- Top Action Bar -->
+      <header class="bg-white border-b border-slate-200 px-6 py-3 flex flex-wrap items-center justify-between gap-3 shadow-xs">
+        <div class="flex items-center gap-2">
+          <!-- Primary Industry Action Button -->
+          <Link :href="primaryActionRoute" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-extrabold text-xs rounded-xl shadow-xs transition-all flex items-center gap-1.5">
+            <PlusIcon class="w-4 h-4 stroke-[3]" />
+            <span>{{ primaryActionButtonLabel }}</span>
+          </Link>
+
+          <!-- Customize Brand & Menu Button -->
+          <Link href="/tenant/settings/navigation" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs rounded-xl shadow-xs transition-all flex items-center gap-1.5">
             <AdjustmentsHorizontalIcon class="w-4 h-4" />
             <span>Customize Brand & Menu</span>
           </Link>
@@ -127,11 +151,11 @@ const isSearchOpen = ref(false);
                 <span class="text-red-600">{{ userName }}</span>
               </h2>
               <p class="text-xs text-slate-600 leading-relaxed">
-                Manage your matrimonial community bio-datas, staff tasks, verification requests, and real-time portal statistics seamlessly.
+                {{ isRealEstate ? 'Manage your real estate listings, rental inquiries, leads, site visits, and client pipelines seamlessly.' : (isMatrimonial ? 'Manage your matrimonial community bio-datas, staff tasks, verification requests, and real-time portal statistics seamlessly.' : `Manage your ${tenantIndustry?.name || 'CRM'} enquiries, student admissions, courses, staff tasks, and pipelines seamlessly.`) }}
               </p>
             </div>
             <div class="pt-6 z-10">
-              <Link href="/matrimonial/directory" class="px-6 py-2.5 bg-red-600 hover:bg-red-700 text-white text-xs font-black rounded-xl shadow-md inline-flex items-center gap-2 transition-all">
+              <Link :href="myWorkRoute" class="px-6 py-2.5 bg-red-600 hover:bg-red-700 text-white text-xs font-black rounded-xl shadow-md inline-flex items-center gap-2 transition-all">
                 <span>Go Now</span>
               </Link>
             </div>
@@ -289,8 +313,8 @@ const isSearchOpen = ref(false);
             </div>
 
             <div class="p-3 border-t border-slate-100 text-right">
-              <Link href="/matrimonial/directory" class="text-xs font-bold text-red-600 hover:underline">
-                View All Services &gt;
+              <Link :href="myWorkRoute" class="text-xs font-bold text-red-600 hover:underline">
+                View All Records &gt;
               </Link>
             </div>
           </div>
@@ -369,9 +393,9 @@ const isSearchOpen = ref(false);
             <div class="p-6 rounded-3xl bg-gradient-to-r from-red-600 to-rose-600 text-white shadow-md flex items-center justify-between">
               <div>
                 <div class="text-2xl font-black">38,566</div>
-                <div class="text-xs font-bold opacity-90">Conversion Members</div>
+                <div class="text-xs font-bold opacity-90">{{ tenantIndustry?.name ? `${tenantIndustry.name} Conversions` : 'Active Conversions' }}</div>
               </div>
-              <div class="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center font-bold">♥</div>
+              <div class="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center font-bold text-lg">{{ businessSettings.business_icon }}</div>
             </div>
 
             <div class="p-6 rounded-3xl bg-gradient-to-r from-sky-600 to-indigo-600 text-white shadow-md flex items-center justify-between">
@@ -388,5 +412,6 @@ const isSearchOpen = ref(false);
 
     <!-- Modals -->
     <GlobalSearchModal :is-open="isSearchOpen" @close="isSearchOpen = false" />
+    <LoginHistoryModal :is-open="isLoginHistoryOpen" @close="isLoginHistoryOpen = false" />
   </div>
 </template>

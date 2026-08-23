@@ -43,13 +43,13 @@ class CrmSalesPanelController extends Controller
 
         // 3. Compute Metrics
         $totalSalesCount = DB::table('crm_transactions')->where('payment_status', 'Paid')->count();
-        $totalRevenue = DB::table('crm_transactions')->where('payment_status', 'Paid')->sum('amount');
-        $activeSubscriptions = DB::table('tenants')->where('status', 'active')->count() ?: 18;
-        $mrr = $totalRevenue ?: 145900.00;
-        $conversionRate = '18.4%';
+        $totalRevenue = (float) DB::table('crm_transactions')->where('payment_status', 'Paid')->sum('amount');
+        $activeSubscriptions = DB::table('tenants')->where('status', 'active')->count();
+        $mrr = $totalRevenue;
+        $conversionRate = $totalSalesCount > 0 ? '100%' : '0%';
 
         $stats = [
-            'total_sales' => '₹' . number_format($totalRevenue ?: 145900.00, 2),
+            'total_sales' => '₹' . number_format($totalRevenue, 2),
             'total_sales_count' => $totalSalesCount,
             'active_subscriptions' => $activeSubscriptions,
             'mrr' => '₹' . number_format($mrr, 2),

@@ -68,12 +68,9 @@ const updateApplicantStage = (appId, stage) => {
 
     <!-- Main Content Area -->
     <div class="flex-1 flex flex-col min-w-0">
-      <header class="bg-white border-b border-slate-200 px-6 py-3.5 flex flex-wrap items-center justify-between gap-3 shadow-xs">
-        <div class="flex flex-wrap items-center gap-2">
-          <button class="px-4 py-1.5 bg-indigo-600 text-white font-extrabold text-xs rounded-xl shadow-xs">My Work</button>
-          <button class="px-4 py-1.5 bg-indigo-600 text-white font-extrabold text-xs rounded-xl shadow-xs">Login History</button>
-          <button class="px-4 py-1.5 bg-indigo-600 text-white font-extrabold text-xs rounded-xl shadow-xs">My Task</button>
-          <button @click="isAddJobOpen = true" class="px-4 py-1.5 bg-indigo-600 text-white font-extrabold text-xs rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer">
+      <header class="bg-white border-b border-slate-200 px-6 py-3 flex items-center justify-between gap-3 shadow-xs">
+        <div class="flex items-center gap-2">
+          <button @click="isAddJobOpen = true" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-extrabold text-xs rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer">
             <PlusIcon class="w-4 h-4 stroke-[3]" />
             <span>+ Post New Job Vacancy</span>
           </button>

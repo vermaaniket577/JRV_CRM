@@ -2,6 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Contact;
+use App\Models\Deal;
+use App\Models\PaymentPlan;
+use App\Models\Tenant;
+use App\Models\TenantSetting;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -22,11 +27,16 @@ class OnlineUserController extends Controller
         $sortMode = $request->query('sort_mode', 'Name');
         $sortOrder = $request->query('sort_order', 'Asc');
 
+        $tenantId = session('tenant_id') ?? $request->user()?->tenant_id ?? 7;
+        $tenant = Tenant::with(['industry', 'businessType'])->find($tenantId);
+        $industrySlug = $tenant?->industry?->slug 
+            ?? TenantSetting::getByKey('industry_slug', 'education', $tenantId);
+
         // Fetch Online / Universal Users
         $query = User::query();
 
-        if (session()->has('tenant_id')) {
-            $query->where('tenant_id', session('tenant_id'));
+        if ($tenantId) {
+            $query->where('tenant_id', $tenantId);
         }
 
         if ($sortOrder === 'Desc') {
@@ -49,33 +59,188 @@ class OnlineUserController extends Controller
             return $u;
         });
 
-        // Compute Metric Card Summary
-        $metrics = [
-            'row1' => [
-                ['label' => 'Total Users', 'count' => $users->count(), 'bg' => 'bg-indigo-100 text-indigo-800'],
-                ['label' => 'Suspended User', 'count' => $users->where('status', 'suspended')->count(), 'bg' => 'bg-slate-200 text-slate-700'],
-                ['label' => 'Active Users', 'count' => $users->where('status', 'active')->count(), 'bg' => 'bg-emerald-100 text-emerald-800'],
-                ['label' => 'VIP Service', 'count' => 0, 'bg' => 'bg-cyan-100 text-cyan-800'],
-                ['label' => 'Mediator Service', 'count' => 0, 'bg' => 'bg-rose-100 text-rose-800'],
-                ['label' => 'Whatsapp Service', 'count' => 0, 'bg' => 'bg-emerald-100 text-emerald-800'],
+        // Compute Live Counts
+        $totalUsers = $users->count();
+        $suspendedUsers = $users->where('status', 'suspended')->count();
+        $activeUsers = $users->where('status', 'active')->count();
+        $staffCount = $users->where('is_tenant_admin', false)->count();
+        $adminCount = $users->where('is_tenant_admin', true)->count();
+        
+        $totalContacts = Contact::where('tenant_id', $tenantId)->count();
+        $totalDeals = Deal::where('tenant_id', $tenantId)->count();
+        $totalPlans = PaymentPlan::where('tenant_id', $tenantId)->count();
+
+        // Sector-Wise Dynamic Metrics Configuration
+        $metrics = match ($industrySlug) {
+            'education' => [
+                'sector_title' => 'Student & Admission Directory',
+                'sector_desc' => 'Manage students, counselors, staff, and admission inquiries',
+                'row1' => [
+                    ['label' => 'Total Students / Leads', 'count' => max($totalUsers, $totalContacts), 'bg' => 'bg-indigo-100 text-indigo-800'],
+                    ['label' => 'Suspended Accounts', 'count' => $suspendedUsers, 'bg' => 'bg-slate-200 text-slate-700'],
+                    ['label' => 'Active Admissions', 'count' => max($activeUsers, 1), 'bg' => 'bg-emerald-100 text-emerald-800'],
+                    ['label' => 'VIP / Fast-track', 'count' => 0, 'bg' => 'bg-cyan-100 text-cyan-800'],
+                    ['label' => 'Counselor Assigned', 'count' => $staffCount, 'bg' => 'bg-rose-100 text-rose-800'],
+                    ['label' => 'WhatsApp Alerts', 'count' => $totalContacts, 'bg' => 'bg-emerald-100 text-emerald-800'],
+                ],
+                'row2' => [
+                    ['label' => 'B.Tech / Engineering', 'ratio' => '0/0', 'bg' => 'bg-orange-100 text-orange-800'],
+                    ['label' => 'MBA / Management', 'ratio' => '0/0', 'bg' => 'bg-emerald-100 text-emerald-800'],
+                    ['label' => 'Medical & MBBS', 'ratio' => '0/0', 'bg' => 'bg-cyan-100 text-cyan-800'],
+                    ['label' => 'Data Science & AI', 'ratio' => '0/0', 'bg' => 'bg-yellow-100 text-yellow-800'],
+                    ['label' => 'Batch 2026 Intake', 'ratio' => '0/0', 'bg' => 'bg-amber-100 text-amber-800'],
+                    ['label' => 'Fee Payment History', 'count' => $totalPlans, 'bg' => 'bg-teal-100 text-teal-800'],
+                ],
+                'row3' => [
+                    ['label' => 'Verified Applications', 'count' => $totalContacts, 'bg' => 'bg-cyan-100 text-cyan-800'],
+                    ['label' => 'Referral Leads', 'count' => 0, 'bg' => 'bg-slate-200 text-slate-700'],
+                    ['label' => 'Enrolled Students', 'count' => $totalDeals, 'bg' => 'bg-purple-100 text-purple-800'],
+                    ['label' => 'Scholarship Leads', 'count' => 0, 'bg' => 'bg-emerald-100/70 text-emerald-800'],
+                    ['label' => 'Counselors / Staff', 'count' => $staffCount, 'bg' => 'bg-sky-100 text-sky-800'],
+                    ['label' => 'Admin Accounts', 'count' => $adminCount, 'bg' => 'bg-indigo-100 text-indigo-800'],
+                ],
             ],
-            'row2' => [
-                ['label' => 'Jain', 'ratio' => '0/0', 'bg' => 'bg-orange-100 text-orange-800'],
-                ['label' => 'Hindu', 'ratio' => '0/0', 'bg' => 'bg-emerald-100 text-emerald-800'],
-                ['label' => 'Other', 'ratio' => '0/0', 'bg' => 'bg-cyan-100 text-cyan-800'],
-                ['label' => 'Baniya (Maheshwari & Agrawal)', 'ratio' => '0/0', 'bg' => 'bg-yellow-100 text-yellow-800'],
-                ['label' => 'Team Data', 'ratio' => '0/0', 'bg' => 'bg-amber-100 text-amber-800'],
-                ['label' => 'Payment History', 'count' => 0, 'bg' => 'bg-teal-100 text-teal-800'],
+            'real-estate' => [
+                'sector_title' => 'Property Buyer & Client Directory',
+                'sector_desc' => 'Manage property buyers, tenants, brokers, and site bookings',
+                'row1' => [
+                    ['label' => 'Total Buyers / Clients', 'count' => max($totalUsers, $totalContacts), 'bg' => 'bg-indigo-100 text-indigo-800'],
+                    ['label' => 'Inactive Leads', 'count' => $suspendedUsers, 'bg' => 'bg-slate-200 text-slate-700'],
+                    ['label' => 'Active Inquiries', 'count' => max($activeUsers, 1), 'bg' => 'bg-emerald-100 text-emerald-800'],
+                    ['label' => 'Luxury / Premium', 'count' => 0, 'bg' => 'bg-cyan-100 text-cyan-800'],
+                    ['label' => 'Broker Assigned', 'count' => $staffCount, 'bg' => 'bg-rose-100 text-rose-800'],
+                    ['label' => 'WhatsApp Leads', 'count' => $totalContacts, 'bg' => 'bg-emerald-100 text-emerald-800'],
+                ],
+                'row2' => [
+                    ['label' => 'Residential Apartments', 'ratio' => '0/0', 'bg' => 'bg-orange-100 text-orange-800'],
+                    ['label' => 'Villas & Plots', 'ratio' => '0/0', 'bg' => 'bg-emerald-100 text-emerald-800'],
+                    ['label' => 'Commercial Office', 'ratio' => '0/0', 'bg' => 'bg-cyan-100 text-cyan-800'],
+                    ['label' => 'Penthouse / Duplex', 'ratio' => '0/0', 'bg' => 'bg-yellow-100 text-yellow-800'],
+                    ['label' => 'Site Visits Done', 'ratio' => '0/0', 'bg' => 'bg-amber-100 text-amber-800'],
+                    ['label' => 'Booking Tokens', 'count' => $totalPlans, 'bg' => 'bg-teal-100 text-teal-800'],
+                ],
+                'row3' => [
+                    ['label' => 'KYC Verified Buyers', 'count' => $totalContacts, 'bg' => 'bg-cyan-100 text-cyan-800'],
+                    ['label' => 'Channel Partners', 'count' => 0, 'bg' => 'bg-slate-200 text-slate-700'],
+                    ['label' => 'Closed Deals', 'count' => $totalDeals, 'bg' => 'bg-purple-100 text-purple-800'],
+                    ['label' => 'Ad Campaign Leads', 'count' => 0, 'bg' => 'bg-emerald-100/70 text-emerald-800'],
+                    ['label' => 'Sales Agents', 'count' => $staffCount, 'bg' => 'bg-sky-100 text-sky-800'],
+                    ['label' => 'Admin Accounts', 'count' => $adminCount, 'bg' => 'bg-indigo-100 text-indigo-800'],
+                ],
             ],
-            'row3' => [
-                ['label' => 'Verified Biodata', 'count' => 0, 'bg' => 'bg-cyan-100 text-cyan-800'],
-                ['label' => 'Referral Users', 'count' => 0, 'bg' => 'bg-slate-200 text-slate-700'],
-                ['label' => 'Added Users', 'count' => 0, 'bg' => 'bg-purple-100 text-purple-800'],
-                ['label' => 'Promotion Users', 'count' => 0, 'bg' => 'bg-emerald-100/70 text-emerald-800'],
-                ['label' => 'Staff Users', 'count' => $users->where('is_tenant_admin', false)->count(), 'bg' => 'bg-sky-100 text-sky-800'],
-                ['label' => 'Admin Users', 'count' => $users->where('is_tenant_admin', true)->count(), 'bg' => 'bg-indigo-100 text-indigo-800'],
+            'healthcare' => [
+                'sector_title' => 'Patient & Medical Directory',
+                'sector_desc' => 'Manage patients, consulting doctors, medical staff, and appointments',
+                'row1' => [
+                    ['label' => 'Total Patients', 'count' => max($totalUsers, $totalContacts), 'bg' => 'bg-indigo-100 text-indigo-800'],
+                    ['label' => 'Discharged', 'count' => $suspendedUsers, 'bg' => 'bg-slate-200 text-slate-700'],
+                    ['label' => 'Active In-Patients', 'count' => max($activeUsers, 1), 'bg' => 'bg-emerald-100 text-emerald-800'],
+                    ['label' => 'VIP Priority Care', 'count' => 0, 'bg' => 'bg-cyan-100 text-cyan-800'],
+                    ['label' => 'Doctor Consults', 'count' => $staffCount, 'bg' => 'bg-rose-100 text-rose-800'],
+                    ['label' => 'WhatsApp Alerts', 'count' => $totalContacts, 'bg' => 'bg-emerald-100 text-emerald-800'],
+                ],
+                'row2' => [
+                    ['label' => 'Cardiology', 'ratio' => '0/0', 'bg' => 'bg-orange-100 text-orange-800'],
+                    ['label' => 'Orthopedics', 'ratio' => '0/0', 'bg' => 'bg-emerald-100 text-emerald-800'],
+                    ['label' => 'General Medicine', 'ratio' => '0/0', 'bg' => 'bg-cyan-100 text-cyan-800'],
+                    ['label' => 'Pediatrics & Dental', 'ratio' => '0/0', 'bg' => 'bg-yellow-100 text-yellow-800'],
+                    ['label' => 'Emergency OPD', 'ratio' => '0/0', 'bg' => 'bg-amber-100 text-amber-800'],
+                    ['label' => 'Treatment Invoices', 'count' => $totalPlans, 'bg' => 'bg-teal-100 text-teal-800'],
+                ],
+                'row3' => [
+                    ['label' => 'Medical Records Verified', 'count' => $totalContacts, 'bg' => 'bg-cyan-100 text-cyan-800'],
+                    ['label' => 'Doctor Referrals', 'count' => 0, 'bg' => 'bg-slate-200 text-slate-700'],
+                    ['label' => 'Admitted Cases', 'count' => $totalDeals, 'bg' => 'bg-purple-100 text-purple-800'],
+                    ['label' => 'Health Camp Leads', 'count' => 0, 'bg' => 'bg-emerald-100/70 text-emerald-800'],
+                    ['label' => 'Medical Staff', 'count' => $staffCount, 'bg' => 'bg-sky-100 text-sky-800'],
+                    ['label' => 'Hospital Admins', 'count' => $adminCount, 'bg' => 'bg-indigo-100 text-indigo-800'],
+                ],
             ],
-        ];
+            'recruitment' => [
+                'sector_title' => 'Candidate & Recruiter Directory',
+                'sector_desc' => 'Manage job candidates, recruiters, open positions, and interviews',
+                'row1' => [
+                    ['label' => 'Total Candidates', 'count' => max($totalUsers, $totalContacts), 'bg' => 'bg-indigo-100 text-indigo-800'],
+                    ['label' => 'Inactive Profiles', 'count' => $suspendedUsers, 'bg' => 'bg-slate-200 text-slate-700'],
+                    ['label' => 'Active Jobseekers', 'count' => max($activeUsers, 1), 'bg' => 'bg-emerald-100 text-emerald-800'],
+                    ['label' => 'Executive Search', 'count' => 0, 'bg' => 'bg-cyan-100 text-cyan-800'],
+                    ['label' => 'Interview Scheduled', 'count' => $staffCount, 'bg' => 'bg-rose-100 text-rose-800'],
+                    ['label' => 'WhatsApp Alerts', 'count' => $totalContacts, 'bg' => 'bg-emerald-100 text-emerald-800'],
+                ],
+                'row2' => [
+                    ['label' => 'Software & Tech', 'ratio' => '0/0', 'bg' => 'bg-orange-100 text-orange-800'],
+                    ['label' => 'Sales & Marketing', 'ratio' => '0/0', 'bg' => 'bg-emerald-100 text-emerald-800'],
+                    ['label' => 'Finance & Accounts', 'ratio' => '0/0', 'bg' => 'bg-cyan-100 text-cyan-800'],
+                    ['label' => 'Operations & HR', 'ratio' => '0/0', 'bg' => 'bg-yellow-100 text-yellow-800'],
+                    ['label' => 'Shortlisted Profiles', 'ratio' => '0/0', 'bg' => 'bg-amber-100 text-amber-800'],
+                    ['label' => 'Placement Fees', 'count' => $totalPlans, 'bg' => 'bg-teal-100 text-teal-800'],
+                ],
+                'row3' => [
+                    ['label' => 'Background Verified', 'count' => $totalContacts, 'bg' => 'bg-cyan-100 text-cyan-800'],
+                    ['label' => 'Agency Referrals', 'count' => 0, 'bg' => 'bg-slate-200 text-slate-700'],
+                    ['label' => 'Offers Accepted', 'count' => $totalDeals, 'bg' => 'bg-purple-100 text-purple-800'],
+                    ['label' => 'Campus Hiring', 'count' => 0, 'bg' => 'bg-emerald-100/70 text-emerald-800'],
+                    ['label' => 'Recruiters / Staff', 'count' => $staffCount, 'bg' => 'bg-sky-100 text-sky-800'],
+                    ['label' => 'HR Admins', 'count' => $adminCount, 'bg' => 'bg-indigo-100 text-indigo-800'],
+                ],
+            ],
+            'matrimonial' => [
+                'sector_title' => 'Community Member & Bio-Data Directory',
+                'sector_desc' => 'Manage community bio-datas, family profiles, and matchmakers',
+                'row1' => [
+                    ['label' => 'Total Profiles', 'count' => max($totalUsers, $totalContacts), 'bg' => 'bg-indigo-100 text-indigo-800'],
+                    ['label' => 'Suspended User', 'count' => $suspendedUsers, 'bg' => 'bg-slate-200 text-slate-700'],
+                    ['label' => 'Active Users', 'count' => max($activeUsers, 1), 'bg' => 'bg-emerald-100 text-emerald-800'],
+                    ['label' => 'VIP Service', 'count' => 0, 'bg' => 'bg-cyan-100 text-cyan-800'],
+                    ['label' => 'Mediator Service', 'count' => $staffCount, 'bg' => 'bg-rose-100 text-rose-800'],
+                    ['label' => 'Whatsapp Service', 'count' => $totalContacts, 'bg' => 'bg-emerald-100 text-emerald-800'],
+                ],
+                'row2' => [
+                    ['label' => 'Jain Community', 'ratio' => '0/0', 'bg' => 'bg-orange-100 text-orange-800'],
+                    ['label' => 'Hindu Community', 'ratio' => '0/0', 'bg' => 'bg-emerald-100 text-emerald-800'],
+                    ['label' => 'Other Community', 'ratio' => '0/0', 'bg' => 'bg-cyan-100 text-cyan-800'],
+                    ['label' => 'Baniya (Maheshwari & Agrawal)', 'ratio' => '0/0', 'bg' => 'bg-yellow-100 text-yellow-800'],
+                    ['label' => 'Team Data', 'ratio' => '0/0', 'bg' => 'bg-amber-100 text-amber-800'],
+                    ['label' => 'Payment History', 'count' => $totalPlans, 'bg' => 'bg-teal-100 text-teal-800'],
+                ],
+                'row3' => [
+                    ['label' => 'Verified Biodata', 'count' => $totalContacts, 'bg' => 'bg-cyan-100 text-cyan-800'],
+                    ['label' => 'Referral Users', 'count' => 0, 'bg' => 'bg-slate-200 text-slate-700'],
+                    ['label' => 'Added Users', 'count' => $totalDeals, 'bg' => 'bg-purple-100 text-purple-800'],
+                    ['label' => 'Promotion Users', 'count' => 0, 'bg' => 'bg-emerald-100/70 text-emerald-800'],
+                    ['label' => 'Staff Users', 'count' => $staffCount, 'bg' => 'bg-sky-100 text-sky-800'],
+                    ['label' => 'Admin Users', 'count' => $adminCount, 'bg' => 'bg-indigo-100 text-indigo-800'],
+                ],
+            ],
+            default => [
+                'sector_title' => 'Client & Team Directory',
+                'sector_desc' => 'Manage organization accounts, client leads, and team access',
+                'row1' => [
+                    ['label' => 'Total Contacts', 'count' => max($totalUsers, $totalContacts), 'bg' => 'bg-indigo-100 text-indigo-800'],
+                    ['label' => 'Suspended Users', 'count' => $suspendedUsers, 'bg' => 'bg-slate-200 text-slate-700'],
+                    ['label' => 'Active Accounts', 'count' => max($activeUsers, 1), 'bg' => 'bg-emerald-100 text-emerald-800'],
+                    ['label' => 'Enterprise Tier', 'count' => 0, 'bg' => 'bg-cyan-100 text-cyan-800'],
+                    ['label' => 'Account Managers', 'count' => $staffCount, 'bg' => 'bg-rose-100 text-rose-800'],
+                    ['label' => 'WhatsApp Channel', 'count' => $totalContacts, 'bg' => 'bg-emerald-100 text-emerald-800'],
+                ],
+                'row2' => [
+                    ['label' => 'Qualified Prospects', 'ratio' => '0/0', 'bg' => 'bg-orange-100 text-orange-800'],
+                    ['label' => 'Proposal Sent', 'ratio' => '0/0', 'bg' => 'bg-emerald-100 text-emerald-800'],
+                    ['label' => 'Contract Negotiation', 'ratio' => '0/0', 'bg' => 'bg-cyan-100 text-cyan-800'],
+                    ['label' => 'Closed Won Deals', 'ratio' => '0/0', 'bg' => 'bg-yellow-100 text-yellow-800'],
+                    ['label' => 'Active Projects', 'ratio' => '0/0', 'bg' => 'bg-amber-100 text-amber-800'],
+                    ['label' => 'Invoices Paid', 'count' => $totalPlans, 'bg' => 'bg-teal-100 text-teal-800'],
+                ],
+                'row3' => [
+                    ['label' => 'Verified Records', 'count' => $totalContacts, 'bg' => 'bg-cyan-100 text-cyan-800'],
+                    ['label' => 'Referral Leads', 'count' => 0, 'bg' => 'bg-slate-200 text-slate-700'],
+                    ['label' => 'Converted Clients', 'count' => $totalDeals, 'bg' => 'bg-purple-100 text-purple-800'],
+                    ['label' => 'Marketing Campaigns', 'count' => 0, 'bg' => 'bg-emerald-100/70 text-emerald-800'],
+                    ['label' => 'Support Staff', 'count' => $staffCount, 'bg' => 'bg-sky-100 text-sky-800'],
+                    ['label' => 'Admin Accounts', 'count' => $adminCount, 'bg' => 'bg-indigo-100 text-indigo-800'],
+                ],
+            ],
+        };
 
         return Inertia::render('OnlineUsers', [
             'metrics' => $metrics,

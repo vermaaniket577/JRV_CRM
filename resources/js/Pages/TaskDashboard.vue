@@ -89,19 +89,8 @@ const updateTaskStatus = (taskId, newStatus) => {
     <Navbar @open-search="isSearchOpen = true" />
 
     <main class="flex-1 p-6 space-y-6 overflow-y-auto max-w-7xl mx-auto w-full">
-      <!-- Top Action Bar matching reference screenshot -->
-      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div class="flex items-center gap-3">
-          <button class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm rounded-xl shadow-md transition-all">
-            My Work
-          </button>
-          <button class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm rounded-xl shadow-md transition-all">
-            Login History
-          </button>
-          <button class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm rounded-xl shadow-md transition-all">
-            My Task
-          </button>
-        </div>
+      <!-- Top Clean Bar -->
+      <div class="flex items-center justify-end gap-4">
 
         <div class="flex items-center gap-4">
           <div class="relative">

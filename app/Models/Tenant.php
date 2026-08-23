@@ -17,11 +17,21 @@ class Tenant extends Model
         'uuid',
         'name',
         'slug',
+        'subdomain',
+        'custom_domain',
         'domain',
         'logo_path',
         'primary_color_hex',
         'currency',
         'status',
+        'database_name',
+        'database_host',
+        'database_port',
+        'database_username',
+        'database_password',
+        'database_status',
+        'database_created_at',
+        'selected_columns_meta',
         'trial_ends_at',
         'industry_id',
         'business_type_id',
@@ -32,9 +42,27 @@ class Tenant extends Model
 
     protected $casts = [
         'trial_ends_at' => 'datetime',
+        'database_created_at' => 'datetime',
         'crm_goals' => 'array',
+        'selected_columns_meta' => 'array',
         'onboarding_completed' => 'boolean',
     ];
+
+    protected $appends = [
+        'subdomain_url',
+    ];
+
+    public function getSubdomainUrlAttribute(): string
+    {
+        $sub = $this->subdomain ?: preg_replace('/[^a-zA-Z0-9]/', '', strtolower($this->slug ?: 'crm'));
+        $appUrl = config('app.url', 'http://localhost');
+        $host = parse_url($appUrl, PHP_URL_HOST) ?: 'localhost';
+        $port = parse_url($appUrl, PHP_URL_PORT);
+        $scheme = parse_url($appUrl, PHP_URL_SCHEME) ?: 'http';
+        
+        $portStr = $port ? ":{$port}" : '';
+        return "{$scheme}://{$sub}.{$host}{$portStr}";
+    }
 
     public function industry(): BelongsTo
     {
@@ -69,6 +97,16 @@ class Tenant extends Model
     public function companies(): HasMany
     {
         return $this->hasMany(Company::class);
+    }
+
+    public function customColumns(): HasMany
+    {
+        return $this->hasMany(TenantCustomColumn::class)->orderBy('display_order');
+    }
+
+    public function crmRecords(): HasMany
+    {
+        return $this->hasMany(TenantCrmRecord::class)->latest();
     }
 
     public function navigationItems(): HasMany

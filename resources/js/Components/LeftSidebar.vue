@@ -37,15 +37,49 @@ const iconMap = {
 };
 
 const page = usePage();
-const customNavList = computed(() => page.props.custom_nav_list || []);
+const customNavList = computed(() => {
+  const list = page.props.custom_nav_list || [];
+  const seenKeys = new Set();
+  const seenRoutes = new Set();
+  return list.filter(item => {
+    if (!item.is_enabled) return false;
+    const key = item.key || item.label;
+    const route = (item.route || '/').split('?')[0].replace(/\/$/, '') || '/';
+    if (seenKeys.has(key) || (route !== '/' && seenRoutes.has(route))) {
+      return false;
+    }
+    seenKeys.add(key);
+    if (route !== '/') seenRoutes.add(route);
+    return true;
+  });
+});
 const businessSettings = computed(() => page.props.business_settings || { business_name: 'JRV CRM', business_icon: '⚡' });
 
 const resolveIcon = (iconName) => iconMap[iconName] || LinkIcon;
 
 const isCurrentRoute = (path) => {
   if (!path) return false;
-  if (path === '/' && page.url === '/') return true;
-  return path !== '/' && page.url.startsWith(path);
+  const currentUrl = page.url || '/';
+  
+  if (currentUrl === path) return true;
+  
+  const currentPath = currentUrl.split('?')[0].replace(/\/$/, '') || '/';
+  const targetPath = path.split('?')[0].replace(/\/$/, '') || '/';
+  
+  if (path.includes('?')) {
+    const targetQuery = path.split('?')[1];
+    return currentPath === targetPath && currentUrl.includes(targetQuery);
+  }
+  
+  if (currentPath === targetPath) {
+    return true;
+  }
+  
+  if (targetPath !== '/' && targetPath !== '/matrimonial' && targetPath !== '/admin' && currentPath.startsWith(targetPath + '/')) {
+    return true;
+  }
+  
+  return false;
 };
 </script>
 

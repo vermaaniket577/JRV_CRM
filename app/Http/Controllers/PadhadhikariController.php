@@ -16,11 +16,11 @@ class PadhadhikariController extends Controller
 
         $metrics = [
             'total_officers' => Padhadhikari::count(),
-            'active_regions' => Padhadhikari::distinct('region')->count('region') ?: 8,
+            'active_regions' => Padhadhikari::distinct('region')->count('region'),
             'national_board_members' => Padhadhikari::where('designation', 'like', '%President%')
                 ->orWhere('designation', 'like', '%Secretary%')
-                ->count() ?: 4,
-            'renewals_due' => 2,
+                ->count(),
+            'renewals_due' => 0,
         ];
 
         return Inertia::render('PadhadhikariDirectory', [

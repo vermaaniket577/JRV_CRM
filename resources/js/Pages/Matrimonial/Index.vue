@@ -4,6 +4,8 @@ import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import Navbar from '@/Components/Navbar.vue';
 import GlobalSearchModal from '@/Components/GlobalSearchModal.vue';
 import CreateMemberModal from '@/Components/CreateMemberModal.vue';
+import DataImportModal from '@/Components/DataImportModal.vue';
+import LoginHistoryModal from '@/Components/LoginHistoryModal.vue';
 import { 
   BellIcon, 
   HomeIcon, 
@@ -20,7 +22,9 @@ import {
   MagnifyingGlassIcon,
   FunnelIcon,
   ChevronLeftIcon,
-  ChevronRightIcon
+  ChevronRightIcon,
+  ArrowUpTrayIcon,
+  ArrowDownTrayIcon
 } from '@heroicons/vue/24/outline';
 
 const props = defineProps({
@@ -39,6 +43,8 @@ const getNavRoute = (key, fallback) => customNav.value[key]?.route || fallback;
 
 const isSearchOpen = ref(false);
 const isCreateMemberOpen = ref(false);
+const isImportModalOpen = ref(false);
+const isLoginHistoryOpen = ref(false);
 const showAdvanceFilter = ref(false);
 const isDense = ref(false);
 const perPage = ref(props.filters.per_page || 25);
@@ -90,22 +96,16 @@ const navigateToPage = (url) => {
     <!-- Main Content Area -->
     <div class="flex-1 flex flex-col min-w-0">
       <!-- Top Header Action Bar -->
-      <header class="bg-white border-b border-slate-200 px-6 py-3.5 flex flex-wrap items-center justify-between gap-3 shadow-xs">
-        <div class="flex flex-wrap items-center gap-2">
-          <button class="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs rounded-xl shadow-xs transition-all">
-            My Work
-          </button>
-          <button class="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs rounded-xl shadow-xs transition-all">
-            Login History
-          </button>
-          <button class="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs rounded-xl shadow-xs transition-all">
-            My Task
-          </button>
-          <button @click="isCreateMemberOpen = true" class="px-4 py-1.5 bg-red-600 hover:bg-red-700 text-white font-extrabold text-xs rounded-xl shadow-xs transition-all flex items-center gap-1.5">
+      <header class="bg-white border-b border-slate-200 px-6 py-3 flex items-center justify-between gap-3 shadow-xs">
+        <div class="flex items-center gap-2">
+          <!-- Add Bio-Data Profile Button -->
+          <button @click="isCreateMemberOpen = true" type="button" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-extrabold text-xs rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer">
             <PlusIcon class="w-4 h-4 stroke-[3]" />
             <span>+ Add Bio-Data Profile</span>
           </button>
-          <Link href="/tenant/settings/navigation" class="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs rounded-xl shadow-xs transition-all flex items-center gap-1.5">
+
+          <!-- Customize Brand & Menu Button -->
+          <Link href="/tenant/settings/navigation" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs rounded-xl shadow-xs transition-all flex items-center gap-1.5">
             <AdjustmentsHorizontalIcon class="w-4 h-4" />
             <span>Customize Brand & Menu</span>
           </Link>
@@ -129,11 +129,43 @@ const navigateToPage = (url) => {
 
       <!-- Page Body Container -->
       <div class="p-6 space-y-6 flex-1 overflow-y-auto w-full">
-        <!-- Top Action Bar & Get Count Button -->
-        <div class="flex items-center justify-between">
-          <button class="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg shadow-xs transition-all">
-            Get Count
-          </button>
+        <!-- Top Action Bar with Import, Export, Count & Add Profile Actions -->
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs">
+          <div class="flex items-center gap-3">
+            <h2 class="text-base font-black text-slate-900">Biodata Profiles Directory</h2>
+            <span class="px-2.5 py-0.5 bg-red-50 text-red-700 text-xs font-bold rounded-full border border-red-200">
+              {{ metrics.total_members }} Total
+            </span>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <!-- Import CSV Button -->
+            <button 
+              @click="isImportModalOpen = true"
+              class="px-3.5 py-2 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs rounded-xl border border-slate-300 shadow-2xs flex items-center gap-1.5 transition cursor-pointer"
+            >
+              <ArrowUpTrayIcon class="w-4 h-4 text-slate-500 stroke-[2.5]" />
+              <span>Import Data</span>
+            </button>
+
+            <!-- Export CSV Button -->
+            <a 
+              href="/matrimonial/export"
+              class="px-3.5 py-2 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs rounded-xl border border-slate-300 shadow-2xs flex items-center gap-1.5 transition"
+            >
+              <ArrowDownTrayIcon class="w-4 h-4 text-slate-500 stroke-[2.5]" />
+              <span>Export Data</span>
+            </a>
+
+            <!-- Add Biodata Button -->
+            <button 
+              @click="isCreateMemberOpen = true"
+              class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-extrabold text-xs rounded-xl shadow-md flex items-center gap-1.5 transition cursor-pointer"
+            >
+              <PlusIcon class="w-4 h-4 stroke-[3]" />
+              <span>+ Add Biodata</span>
+            </button>
+          </div>
         </div>
 
         <!-- Comprehensive Multi-Criteria Bio-data Filter Bar -->
@@ -491,5 +523,14 @@ const navigateToPage = (url) => {
     <!-- Modals -->
     <GlobalSearchModal :is-open="isSearchOpen" @close="isSearchOpen = false" />
     <CreateMemberModal :is-open="isCreateMemberOpen" :counselors="counselors" @close="isCreateMemberOpen = false" />
+    <LoginHistoryModal :is-open="isLoginHistoryOpen" @close="isLoginHistoryOpen = false" />
+    <DataImportModal 
+      :is-open="isImportModalOpen" 
+      title="Import Biodata Profiles (CSV)"
+      import-url="/matrimonial/import"
+      sample-url="/matrimonial/sample-csv"
+      description="Upload a CSV file with Candidate Name, Gender, Date of Birth, Marital Status, Religion, Caste, Phone, and Email."
+      @close="isImportModalOpen = false" 
+    />
   </div>
 </template>

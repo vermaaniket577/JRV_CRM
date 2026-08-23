@@ -1,6 +1,7 @@
 <script setup>
 import { ref, computed } from 'vue';
 import { Head, Link, usePage } from '@inertiajs/vue3';
+import Navbar from '@/Components/Navbar.vue';
 import GlobalSearchModal from '@/Components/GlobalSearchModal.vue';
 import { 
   BellIcon, 
@@ -31,7 +32,7 @@ const props = defineProps({
 
 const page = usePage();
 const customNav = computed(() => page.props.custom_nav || {});
-const businessSettings = computed(() => page.props.business_settings || { business_name: 'JRV CRM', business_icon: '♥' });
+const businessSettings = computed(() => page.props.business_settings || { business_name: 'JRV CRM', business_icon: '🎓' });
 
 const getNavLabel = (key, fallback) => customNav.value[key]?.label || fallback;
 const getNavRoute = (key, fallback) => customNav.value[key]?.route || fallback;
@@ -60,61 +61,14 @@ const copyText = (text, type) => {
   <Head title="Website Integration & Embed Portal - JRV CRM" />
 
   <div class="min-h-screen bg-slate-100 flex font-sans text-slate-900">
-    <!-- Left Vertical Sidebar -->
-    <aside class="w-24 bg-white border-r border-slate-200 flex flex-col items-center py-4 space-y-6 shrink-0 shadow-xs">
-      <Link href="/" class="flex flex-col items-center gap-1 group">
-        <div class="w-12 h-12 bg-red-600 rounded-2xl flex items-center justify-center text-white font-black text-xl shadow-md shadow-red-600/30">
-          {{ businessSettings.business_icon }}
-        </div>
-        <span class="text-[9px] font-black text-red-600 tracking-tighter uppercase text-center px-1 leading-tight line-clamp-1">
-          {{ businessSettings.business_name }}
-        </span>
-      </Link>
-
-      <nav class="flex-1 w-full space-y-3 px-2">
-        <Link :href="getNavRoute('app', '/')" class="flex flex-col items-center justify-center p-2 rounded-xl text-slate-500 hover:bg-slate-100 transition-all text-center">
-          <HomeIcon class="w-5 h-5 text-slate-400" />
-          <span class="text-[9px] font-bold mt-1 leading-tight line-clamp-1">{{ getNavLabel('app', 'App') }}</span>
-        </Link>
-        <Link href="/matrimonial/directory" class="flex flex-col items-center justify-center p-2 rounded-xl text-slate-500 hover:bg-slate-100 transition-all text-center">
-          <DocumentTextIcon class="w-5 h-5 text-slate-400" />
-          <span class="text-[9px] font-bold mt-1 leading-tight line-clamp-1">{{ getNavLabel('biodata', 'Biodata') }}</span>
-        </Link>
-        <Link href="/broadcast-message" class="flex flex-col items-center justify-center p-2 rounded-xl text-slate-500 hover:bg-slate-100 transition-all text-center">
-          <SignalIcon class="w-5 h-5 text-slate-400" />
-          <span class="text-[9px] font-bold mt-1 leading-tight line-clamp-1">{{ getNavLabel('broadcast', 'BroadCast...') }}</span>
-        </Link>
-        <Link href="/online-users" class="flex flex-col items-center justify-center p-2 rounded-xl text-slate-500 hover:bg-slate-100 transition-all text-center">
-          <UserIcon class="w-5 h-5 text-slate-400" />
-          <span class="text-[9px] font-bold mt-1 leading-tight line-clamp-1">{{ getNavLabel('online_user', 'Online User') }}</span>
-        </Link>
-        <Link href="/auto-update" class="flex flex-col items-center justify-center p-2 rounded-xl text-slate-500 hover:bg-slate-100 transition-all text-center">
-          <ArrowPathIcon class="w-5 h-5 text-slate-400" />
-          <span class="text-[9px] font-bold mt-1 leading-tight line-clamp-1">{{ getNavLabel('auto_update', 'Auto Update') }}</span>
-        </Link>
-        <Link href="/padhadhikari-directory" class="flex flex-col items-center justify-center p-2 rounded-xl text-slate-500 hover:bg-slate-100 transition-all text-center">
-          <AcademicCapIcon class="w-5 h-5 text-slate-400" />
-          <span class="text-[9px] font-bold mt-1 leading-tight line-clamp-1">{{ getNavLabel('padhadhikari', 'Padhadhikari') }}</span>
-        </Link>
-        <Link href="/staff-recruitment" class="flex flex-col items-center justify-center p-2 rounded-xl text-slate-500 hover:bg-slate-100 transition-all text-center">
-          <BriefcaseIcon class="w-5 h-5 text-slate-400" />
-          <span class="text-[9px] font-bold mt-1 leading-tight line-clamp-1">{{ getNavLabel('staff_recruit', 'Staff Recruit') }}</span>
-        </Link>
-        <Link href="/employee-management" class="flex flex-col items-center justify-center p-2 rounded-xl text-slate-500 hover:bg-slate-100 transition-all text-center">
-          <UserGroupIcon class="w-5 h-5 text-slate-400" />
-          <span class="text-[9px] font-bold mt-1 leading-tight line-clamp-1">{{ getNavLabel('staff_management', 'Staff Manag...') }}</span>
-        </Link>
-      </nav>
-    </aside>
+    <!-- Fixed Left Vertical Sidebar -->
+    <Navbar @open-search="isSearchOpen = true" />
 
     <!-- Main Content Area -->
     <div class="flex-1 flex flex-col min-w-0">
-      <header class="bg-white border-b border-slate-200 px-6 py-3.5 flex flex-wrap items-center justify-between gap-3 shadow-xs">
-        <div class="flex flex-wrap items-center gap-2">
-          <button class="px-4 py-1.5 bg-red-600 text-white font-extrabold text-xs rounded-xl shadow-xs">My Work</button>
-          <button class="px-4 py-1.5 bg-red-600 text-white font-extrabold text-xs rounded-xl shadow-xs">Login History</button>
-          <button class="px-4 py-1.5 bg-red-600 text-white font-extrabold text-xs rounded-xl shadow-xs">My Task</button>
-          <Link href="/tenant/settings/navigation" class="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs rounded-xl shadow-xs flex items-center gap-1.5">
+      <header class="bg-white border-b border-slate-200 px-6 py-3 flex items-center justify-between gap-3 shadow-xs">
+        <div class="flex items-center gap-2">
+          <Link href="/tenant/settings/navigation" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs rounded-xl shadow-xs flex items-center gap-1.5 transition">
             <AdjustmentsHorizontalIcon class="w-4 h-4" />
             <span>Customize Brand & Menu</span>
           </Link>

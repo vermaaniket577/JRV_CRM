@@ -121,14 +121,11 @@ const submit = () => {
     <!-- Main Content Area -->
     <div class="flex-1 flex flex-col min-w-0">
       <!-- Top Action Bar -->
-      <header class="bg-white border-b border-slate-200 px-6 py-3.5 flex flex-wrap items-center justify-between gap-3 shadow-xs">
-        <div class="flex flex-wrap items-center gap-2">
-          <button class="px-4 py-1.5 bg-red-600 hover:bg-red-700 text-white font-extrabold text-xs rounded-xl shadow-xs transition-all">My Work</button>
-          <button class="px-4 py-1.5 bg-red-600 hover:bg-red-700 text-white font-extrabold text-xs rounded-xl shadow-xs transition-all">Login History</button>
-          <button class="px-4 py-1.5 bg-red-600 hover:bg-red-700 text-white font-extrabold text-xs rounded-xl shadow-xs transition-all">My Task</button>
-          <button @click="isComposeOpen = true" class="px-4 py-1.5 bg-red-600 hover:bg-red-700 text-white font-extrabold text-xs rounded-xl shadow-xs transition-all flex items-center gap-1.5">
+      <header class="bg-white border-b border-slate-200 px-6 py-3 flex items-center justify-between gap-3 shadow-xs">
+        <div class="flex items-center gap-2">
+          <button @click="isComposeOpen = true" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-extrabold text-xs rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer">
             <PaperAirplaneIcon class="w-4 h-4" />
-            <span>New BroadCast Message</span>
+            <span>+ New BroadCast Message</span>
           </button>
         </div>
 

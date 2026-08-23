@@ -4,7 +4,9 @@ namespace App\Http\Controllers\Tenant;
 
 use App\Http\Controllers\Controller;
 use App\Models\NavigationItem;
+use App\Models\Tenant;
 use App\Models\TenantSetting;
+use App\Services\TenantDatabaseService;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -12,9 +14,24 @@ use Inertia\Response;
 
 class NavigationCustomizerController extends Controller
 {
+    protected TenantDatabaseService $databaseService;
+
+    public function __construct(TenantDatabaseService $databaseService)
+    {
+        $this->databaseService = $databaseService;
+    }
+
     public function index(): Response
     {
-        $items = NavigationItem::orderBy('display_order')->get();
+        $tenantId = session('tenant_id') ?? auth()->user()?->tenant_id;
+        
+        $query = NavigationItem::query();
+        if ($tenantId) {
+            $query->where(function ($q) use ($tenantId) {
+                $q->where('tenant_id', $tenantId)->orWhereNull('tenant_id');
+            });
+        }
+        $items = $query->orderBy('display_order')->get()->unique('key')->values();
 
         $businessSettings = [
             'business_name' => TenantSetting::getByKey('business_name', 'JSM CRM'),
@@ -38,6 +55,9 @@ class NavigationCustomizerController extends Controller
 
     public function update(Request $request): RedirectResponse
     {
+        $tenantId = session('tenant_id') ?? auth()->user()?->tenant_id;
+        $tenant = $tenantId ? Tenant::find($tenantId) : null;
+
         $validated = $request->validate([
             'business_name' => ['nullable', 'string', 'max:255'],
             'business_icon' => ['nullable', 'string', 'max:50'],
@@ -71,6 +91,7 @@ class NavigationCustomizerController extends Controller
         foreach ($validated['items'] as $itemData) {
             if (!empty($itemData['id'])) {
                 NavigationItem::where('id', $itemData['id'])->update([
+                    'tenant_id' => $tenantId,
                     'key' => $itemData['key'],
                     'label' => $itemData['label'],
                     'icon' => $itemData['icon'],
@@ -80,6 +101,7 @@ class NavigationCustomizerController extends Controller
                 ]);
             } else {
                 NavigationItem::create([
+                    'tenant_id' => $tenantId,
                     'key' => $itemData['key'],
                     'label' => $itemData['label'],
                     'icon' => $itemData['icon'],
@@ -90,7 +112,17 @@ class NavigationCustomizerController extends Controller
             }
         }
 
-        return redirect()->back()->with('success', 'Navigation menu & settings updated successfully.');
+        // Direct sync into tenant's dedicated MySQL database
+        if ($tenant) {
+            $this->databaseService->syncTenantNavigation($tenant, $validated['items']);
+            $this->databaseService->syncTenantSettings($tenant, [
+                'business_name' => $validated['business_name'] ?? $tenant->name,
+                'business_icon' => $validated['business_icon'] ?? '⚡',
+                'brand_color' => $validated['brand_color'] ?? '#dc2626',
+            ]);
+        }
+
+        return redirect()->back()->with('success', 'Navigation menu & customizations saved directly into your database!');
     }
 
     public function destroy($id): RedirectResponse

@@ -80,34 +80,7 @@ const submit = () => {
           >
             All Bearers
           </button>
-          <button 
-            @click="activeTab = 'my_work'"
-            :class="[
-              'px-4 py-1.5 font-extrabold text-xs rounded-xl shadow-xs transition-all cursor-pointer',
-              activeTab === 'my_work' ? 'bg-red-600 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-            ]"
-          >
-            My Work
-          </button>
-          <button 
-            @click="activeTab = 'login_history'"
-            :class="[
-              'px-4 py-1.5 font-extrabold text-xs rounded-xl shadow-xs transition-all cursor-pointer',
-              activeTab === 'login_history' ? 'bg-red-600 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-            ]"
-          >
-            Login History
-          </button>
-          <button 
-            @click="activeTab = 'my_tasks'"
-            :class="[
-              'px-4 py-1.5 font-extrabold text-xs rounded-xl shadow-xs transition-all cursor-pointer',
-              activeTab === 'my_tasks' ? 'bg-red-600 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-            ]"
-          >
-            My Task
-          </button>
-          <button @click="isAddOpen = true" class="px-4 py-1.5 bg-red-600 hover:bg-red-700 text-white font-extrabold text-xs rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer">
+          <button @click="isAddOpen = true" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white font-extrabold text-xs rounded-xl shadow-xs flex items-center gap-1.5 cursor-pointer">
             <PlusIcon class="w-4 h-4 stroke-[3]" />
             <span>+ Add Office Bearer</span>
           </button>
@@ -202,7 +175,7 @@ const submit = () => {
 
               <div class="pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500 font-semibold">
                 <span>Status: <strong class="text-emerald-600">{{ o.status }}</strong></span>
-                <span>Term: {{ o.term_start }} - {{ o.term_end || 'Present' }}</span>
+                <span>Term: {{ o.term_start ? o.term_start.substring(0, 10) : '' }} - {{ o.term_end ? o.term_end.substring(0, 10) : 'Present' }}</span>
               </div>
             </div>
           </div>

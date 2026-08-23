@@ -4,6 +4,8 @@ import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import Navbar from '@/Components/Navbar.vue';
 import GlobalSearchModal from '@/Components/GlobalSearchModal.vue';
 import CreateEmployeeModal from '@/Components/CreateEmployeeModal.vue';
+import DataImportModal from '@/Components/DataImportModal.vue';
+import LoginHistoryModal from '@/Components/LoginHistoryModal.vue';
 import { 
   BellIcon, 
   UserGroupIcon, 
@@ -17,7 +19,9 @@ import {
   GlobeAltIcon,
   AdjustmentsHorizontalIcon,
   PlusIcon,
-  TrashIcon
+  TrashIcon,
+  ArrowUpTrayIcon,
+  ArrowDownTrayIcon
 } from '@heroicons/vue/24/outline';
 
 const props = defineProps({
@@ -40,6 +44,8 @@ const getNavRoute = (key, fallback) => {
 
 const isSearchOpen = ref(false);
 const isCreateEmployeeOpen = ref(false);
+const isImportModalOpen = ref(false);
+const isLoginHistoryOpen = ref(false);
 
 const searchType = ref(props.filters.type || 'ID');
 const searchQuery = ref(props.filters.query || '');
@@ -104,18 +110,10 @@ const formatINR = (val) => {
     <!-- Main Content Area -->
     <div class="flex-1 flex flex-col min-w-0">
       <!-- Top Action Bar -->
-      <header class="bg-white border-b border-slate-200 px-6 py-3.5 flex flex-wrap items-center justify-between gap-3 shadow-xs">
-        <div class="flex flex-wrap items-center gap-2">
-          <button class="px-4 py-1.5 bg-red-600 hover:bg-red-700 text-white font-extrabold text-xs rounded-xl shadow-xs transition-all">
-            My Work
-          </button>
-          <button class="px-4 py-1.5 bg-red-600 hover:bg-red-700 text-white font-extrabold text-xs rounded-xl shadow-xs transition-all">
-            Login History
-          </button>
-          <button class="px-4 py-1.5 bg-red-600 hover:bg-red-700 text-white font-extrabold text-xs rounded-xl shadow-xs transition-all">
-            My Task
-          </button>
-          <Link href="/tenant/settings/navigation" class="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs rounded-xl shadow-xs transition-all flex items-center gap-1.5">
+      <header class="bg-white border-b border-slate-200 px-6 py-3 flex items-center justify-between gap-3 shadow-xs">
+        <div class="flex items-center gap-2">
+          <!-- Customize Menu Names Button -->
+          <Link href="/tenant/settings/navigation" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs rounded-xl shadow-xs transition-all flex items-center gap-1.5">
             <AdjustmentsHorizontalIcon class="w-4 h-4" />
             <span>Customize Menu Names</span>
           </Link>
@@ -139,19 +137,40 @@ const formatINR = (val) => {
 
       <!-- Page Content -->
       <div class="p-8 space-y-6 flex-1 overflow-y-auto">
-        <!-- Header Bar with Add Employee Action -->
-        <div class="flex items-center justify-between">
+        <!-- Header Bar with Add Employee, Import & Export Actions -->
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <h1 class="text-2xl font-extrabold text-slate-900 tracking-tight">
             {{ getNavLabel('staff_management', 'Employee Management') }}
           </h1>
 
-          <button 
-            @click="isCreateEmployeeOpen = true"
-            class="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white font-extrabold text-xs rounded-xl shadow-md flex items-center gap-2 transition-all"
-          >
-            <PlusIcon class="w-4 h-4 stroke-[3]" />
-            <span>Add Employee</span>
-          </button>
+          <div class="flex items-center gap-2.5">
+            <!-- Import CSV Button -->
+            <button 
+              @click="isImportModalOpen = true"
+              class="px-4 py-2.5 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs rounded-xl border border-slate-300 shadow-2xs flex items-center gap-1.5 transition cursor-pointer"
+            >
+              <ArrowUpTrayIcon class="w-4 h-4 text-slate-500 stroke-[2.5]" />
+              <span>Import Data</span>
+            </button>
+
+            <!-- Export CSV Button -->
+            <a 
+              href="/employee-management/export"
+              class="px-4 py-2.5 bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs rounded-xl border border-slate-300 shadow-2xs flex items-center gap-1.5 transition"
+            >
+              <ArrowDownTrayIcon class="w-4 h-4 text-slate-500 stroke-[2.5]" />
+              <span>Export Data</span>
+            </a>
+
+            <!-- Add Employee Modal Button -->
+            <button 
+              @click="isCreateEmployeeOpen = true"
+              class="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white font-extrabold text-xs rounded-xl shadow-md flex items-center gap-2 transition-all cursor-pointer"
+            >
+              <PlusIcon class="w-4 h-4 stroke-[3]" />
+              <span>Add Employee</span>
+            </button>
+          </div>
         </div>
 
         <!-- 5 Gradient Metric Cards -->
@@ -326,5 +345,14 @@ const formatINR = (val) => {
     <!-- Modals -->
     <GlobalSearchModal :is-open="isSearchOpen" @close="isSearchOpen = false" />
     <CreateEmployeeModal :is-open="isCreateEmployeeOpen" @close="isCreateEmployeeOpen = false" />
+    <LoginHistoryModal :is-open="isLoginHistoryOpen" @close="isLoginHistoryOpen = false" />
+    <DataImportModal 
+      :is-open="isImportModalOpen" 
+      title="Import Employee Records (CSV)"
+      import-url="/employee-management/import"
+      sample-url="/employee-management/sample-csv"
+      description="Upload a CSV file with Employee Name, Email, Phone, Department, Designation, and Salary."
+      @close="isImportModalOpen = false" 
+    />
   </div>
 </template>

@@ -104,29 +104,9 @@ const clearFilter = () => {
 
     <!-- RIGHT MAIN CONTENT AREA -->
     <div class="flex-1 flex flex-col min-w-0">
-      <!-- Top Action Bar (Red & Indigo Pill Buttons) -->
-      <header class="bg-white border-b border-slate-200 px-6 py-3.5 flex flex-wrap items-center justify-between gap-3 shadow-xs">
-        <div class="flex flex-wrap items-center gap-2">
-          <button class="px-4 py-1.5 bg-red-600 hover:bg-red-700 text-white font-extrabold text-xs rounded-xl shadow-xs transition-all">
-            My Work
-          </button>
-          <button class="px-4 py-1.5 bg-red-600 hover:bg-red-700 text-white font-extrabold text-xs rounded-xl shadow-xs transition-all">
-            Login History
-          </button>
-          <button class="px-4 py-1.5 bg-red-600 hover:bg-red-700 text-white font-extrabold text-xs rounded-xl shadow-xs transition-all">
-            My Task
-          </button>
-
-          <Link href="/crm-selling-panel" class="px-4 py-1.5 bg-gradient-to-r from-emerald-600 to-indigo-600 hover:from-emerald-500 hover:to-indigo-500 text-white font-extrabold text-xs rounded-xl shadow-xs transition-all flex items-center gap-1.5">
-            <SparklesIcon class="w-4 h-4" />
-            <span>CRM Selling Panel</span>
-          </Link>
-
-          <Link href="/tenant/settings/navigation" class="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs rounded-xl shadow-xs transition-all flex items-center gap-1.5">
-            <AdjustmentsHorizontalIcon class="w-4 h-4" />
-            <span>Customize Menu Names</span>
-          </Link>
-        </div>
+      <!-- Top Clean Header Area -->
+      <header class="bg-white border-b border-slate-200 px-6 py-3 flex items-center justify-between gap-3 shadow-xs">
+        <div></div>
 
         <div class="flex items-center gap-3">
           <button @click="isSearchOpen = true" class="p-2 bg-slate-100 rounded-full text-slate-600 hover:bg-slate-200 relative">
@@ -154,9 +134,9 @@ const clearFilter = () => {
           <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-1">
             <div>
               <h1 class="text-2xl font-extrabold text-slate-900 tracking-tight">
-                {{ getNavLabel('online_user', 'Online User') }}
+                {{ metrics.sector_title || getNavLabel('online_user', 'User Directory') }}
               </h1>
-              <p class="text-xs text-slate-500 font-medium mt-0.5">Manage organization accounts and user access</p>
+              <p class="text-xs text-slate-500 font-medium mt-0.5">{{ metrics.sector_desc || 'Manage organization accounts and user access' }}</p>
             </div>
 
             <!-- Red Pill + New User Button -->

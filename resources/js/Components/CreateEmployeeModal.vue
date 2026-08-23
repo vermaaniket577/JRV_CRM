@@ -32,8 +32,8 @@ const submit = () => {
 </script>
 
 <template>
-  <div v-if="isOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs">
-    <div class="bg-white border border-slate-200 rounded-3xl max-w-lg w-full shadow-2xl flex flex-col overflow-hidden">
+  <div v-if="isOpen" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs overflow-y-auto">
+    <div class="bg-white border border-slate-200 rounded-3xl max-w-lg w-full shadow-2xl flex flex-col max-h-[90vh] overflow-y-auto my-auto">
       <!-- Header -->
       <div class="p-5 border-b border-slate-200 flex items-center justify-between">
         <h3 class="text-lg font-bold text-slate-900">Add New Employee</h3>

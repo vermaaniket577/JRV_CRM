@@ -172,4 +172,120 @@ class EmployeeController extends Controller
         $employee->delete();
         return redirect()->back()->with('success', 'Employee removed.');
     }
+
+    public function export(Request $request)
+    {
+        $employees = User::with('employeeProfile')->where('is_super_admin', false)->latest()->get();
+        $filename = 'employees_export_' . date('Y_m_d_His') . '.csv';
+
+        $headers = [
+            'Content-Type' => 'text/csv',
+            'Content-Disposition' => "attachment; filename=\"$filename\"",
+            'Pragma' => 'no-cache',
+            'Cache-Control' => 'must-revalidate, post-check=0, pre-check=0',
+            'Expires' => '0',
+        ];
+
+        $callback = function () use ($employees) {
+            $file = fopen('php://output', 'w');
+            fputcsv($file, ['Employee Code', 'Full Name', 'Email', 'Phone', 'Department', 'Designation', 'Salary', 'Attendance Status', 'Gender', 'State', 'City', 'Status']);
+
+            foreach ($employees as $emp) {
+                $p = $emp->employeeProfile;
+                fputcsv($file, [
+                    $p?->employee_code ?? ('EMP-' . str_pad($emp->id, 4, '0', STR_PAD_LEFT)),
+                    $emp->name,
+                    $emp->email,
+                    $p?->phone ?? '',
+                    $p?->department ?? 'General',
+                    $p?->designation ?? 'Staff',
+                    $p?->salary ?? 0,
+                    $p?->attendance_status ?? 'Present',
+                    $p?->gender ?? 'Male',
+                    $p?->state ?? '',
+                    $p?->city ?? '',
+                    $emp->status ?? 'active',
+                ]);
+            }
+            fclose($file);
+        };
+
+        return response()->stream($callback, 200, $headers);
+    }
+
+    public function downloadSample()
+    {
+        $headers = [
+            'Content-Type' => 'text/csv',
+            'Content-Disposition' => "attachment; filename=\"sample_employees_template.csv\"",
+        ];
+
+        $callback = function () {
+            $file = fopen('php://output', 'w');
+            fputcsv($file, ['Full Name', 'Email', 'Phone', 'Department', 'Designation', 'Salary', 'Attendance Status', 'Gender', 'State', 'City']);
+            fputcsv($file, ['John Doe', 'john.doe@company.com', '+91 9876543210', 'Sales', 'Senior Manager', '65000', 'Present', 'Male', 'California', 'San Francisco']);
+            fputcsv($file, ['Priya Sharma', 'priya.sharma@company.com', '+91 9876543211', 'Matchmaking', 'Relationship Manager', '55000', 'Present', 'Female', 'New York', 'New York City']);
+            fclose($file);
+        };
+
+        return response()->stream($callback, 200, $headers);
+    }
+
+    public function import(Request $request): RedirectResponse
+    {
+        $request->validate([
+            'file' => ['required', 'file', 'mimes:csv,txt'],
+        ]);
+
+        $file = $request->file('file');
+        $handle = fopen($file->getRealPath(), 'r');
+        $header = fgetcsv($handle);
+        $importedCount = 0;
+
+        while (($row = fgetcsv($handle)) !== false) {
+            if (empty($row[0]) || empty($row[1])) continue;
+
+            $name = trim($row[0]);
+            $email = trim($row[1]);
+            $phone = isset($row[2]) ? trim($row[2]) : null;
+            $department = isset($row[3]) && !empty(trim($row[3])) ? trim($row[3]) : 'Sales';
+            $designation = isset($row[4]) && !empty(trim($row[4])) ? trim($row[4]) : 'Staff Representative';
+            $salary = isset($row[5]) && is_numeric(trim($row[5])) ? (float) trim($row[5]) : 45000;
+            $attendance = isset($row[6]) && in_array(trim($row[6]), ['Present', 'Absent', 'On Leave', 'Half Day']) ? trim($row[6]) : 'Present';
+            $gender = isset($row[7]) && in_array(trim($row[7]), ['Male', 'Female', 'Other']) ? trim($row[7]) : 'Male';
+            $state = isset($row[8]) ? trim($row[8]) : 'California';
+            $city = isset($row[9]) ? trim($row[9]) : 'San Francisco';
+
+            $user = User::updateOrCreate(
+                ['email' => $email],
+                [
+                    'name' => $name,
+                    'password' => Hash::make('password123'),
+                    'status' => 'active',
+                ]
+            );
+
+            EmployeeProfile::updateOrCreate(
+                ['user_id' => $user->id],
+                [
+                    'employee_code' => 'EMP-' . str_pad($user->id, 4, '0', STR_PAD_LEFT),
+                    'department' => $department,
+                    'designation' => $designation,
+                    'salary' => $salary,
+                    'attendance_status' => $attendance,
+                    'gender' => $gender,
+                    'phone' => $phone,
+                    'state' => $state,
+                    'city' => $city,
+                    'joining_date' => now(),
+                ]
+            );
+
+            $importedCount++;
+        }
+
+        fclose($handle);
+
+        return redirect()->back()->with('success', "{$importedCount} employee records successfully imported.");
+    }
 }
