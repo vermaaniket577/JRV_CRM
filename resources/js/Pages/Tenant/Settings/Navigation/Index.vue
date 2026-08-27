@@ -51,12 +51,14 @@ const onLabelInput = () => {
 };
 
 const presets = [
-  { label: 'Admin Panel', key: 'admin_panel', route: '/admin', icon: 'ShieldCheckIcon' },
   { label: 'App Dashboard', key: 'app', route: '/app', icon: 'HomeIcon' },
   { label: 'Dashboard', key: 'dashboard', route: '/dashboard', icon: 'ChartBarIcon' },
-  { label: 'CRM Sales Panel', key: 'crm_sales', route: '/crm-sales-panel', icon: 'ChartBarIcon' },
-  { label: 'CRM Selling Panel', key: 'crm_selling', route: '/crm-selling-panel', icon: 'RocketLaunchIcon' },
+  { label: 'Enquiries / Leads', key: 'leads', route: '/leads', icon: 'UserIcon' },
   { label: 'Contacts', key: 'contacts', route: '/contacts', icon: 'UserIcon' },
+  { label: 'Staff Recruitment', key: 'staff_recruit', route: '/staff-recruitment', icon: 'BriefcaseIcon' },
+  { label: 'Data Import Hub', key: 'data_import', route: '/data-import', icon: 'TableCellsIcon' },
+  { label: 'Staff Management', key: 'staff_management', route: '/employee-management', icon: 'UserGroupIcon' },
+  { label: 'Task Dashboard', key: 'task_dashboard', route: '/task-dashboard', icon: 'ClipboardDocumentListIcon' },
 ];
 
 const applyPreset = (preset) => {

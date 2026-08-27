@@ -26,7 +26,9 @@ import {
   Square3Stack3DIcon,
   ClipboardDocumentListIcon,
   BuildingOfficeIcon,
+  BuildingOffice2Icon,
   ChartBarIcon,
+  ChartPieIcon,
   HeartIcon,
   CodeBracketIcon,
   EnvelopeIcon,
@@ -39,7 +41,14 @@ import {
   Cog6ToothIcon,
   CreditCardIcon,
   CheckBadgeIcon,
-  ClockIcon
+  ClockIcon,
+  TableCellsIcon,
+  ArrowDownTrayIcon,
+  CpuChipIcon,
+  CurrencyRupeeIcon,
+  CurrencyDollarIcon,
+  BookOpenIcon,
+  ClipboardDocumentCheckIcon
 } from '@heroicons/vue/24/outline';
 
 const iconMap = {
@@ -56,7 +65,9 @@ const iconMap = {
   Square3Stack3DIcon,
   ClipboardDocumentListIcon,
   BuildingOfficeIcon,
+  BuildingOffice2Icon,
   ChartBarIcon,
+  ChartPieIcon,
   HeartIcon,
   CodeBracketIcon,
   EnvelopeIcon,
@@ -69,7 +80,15 @@ const iconMap = {
   Cog6ToothIcon,
   CreditCardIcon,
   CheckBadgeIcon,
-  ClockIcon
+  ClockIcon,
+  TableCellsIcon,
+  ArrowDownTrayIcon,
+  SparklesIcon,
+  CpuChipIcon,
+  CurrencyRupeeIcon,
+  CurrencyDollarIcon,
+  BookOpenIcon,
+  ClipboardDocumentCheckIcon
 };
 
 const emit = defineEmits(['open-search']);
@@ -105,6 +124,7 @@ const tenantIndustry = computed(() => page.props.tenant_industry);
 const currentTenant = computed(() => page.props.current_tenant);
 const tenantStorage = computed(() => page.props.tenant_storage || { used_gb: 1.25, limit_gb: 5.0, used_percent: 25, is_over_limit: false });
 const authUser = computed(() => page.props.auth?.user);
+const isMasterAdmin = computed(() => Boolean(page.props.auth?.is_master_admin || authUser.value?.is_super_admin));
 
 const isMasterAdminPage = computed(() => {
   const url = page.url || '';
@@ -144,7 +164,7 @@ const resolveIcon = (iconName) => {
 <template>
   <aside 
     :class="[
-      'bg-white border-r border-slate-200/90 transition-all duration-300 z-40 flex flex-col justify-between p-4 sticky top-0 h-screen select-none group/sidebar overflow-y-auto',
+      'fixed top-0 left-0 bottom-0 h-screen bg-white border-r border-slate-200/90 transition-all duration-300 z-40 flex flex-col justify-between p-4 select-none group/sidebar overflow-y-auto',
       isCollapsed ? 'w-20 hover:w-64 shadow-lg' : 'w-64 shadow-xs'
     ]"
   >
@@ -351,56 +371,48 @@ const resolveIcon = (iconName) => {
         </div>
       </div>
 
-      <Link 
-        v-if="isMasterAdminPage"
-        href="/admin"
-        title="Master Admin Control Panel"
-        :class="[
-          'w-full px-3 py-2 bg-slate-900 text-white hover:bg-slate-800 rounded-xl text-xs font-semibold shadow-xs transition flex items-center justify-center gap-2',
-          isCurrentRoute('/admin') ? 'ring-2 ring-red-500' : ''
-        ]"
-      >
-        <ShieldCheckIcon class="w-4 h-4 text-red-500 shrink-0" />
-        <span 
-          class="truncate transition-opacity duration-75"
-          :class="[isCollapsed ? 'opacity-0 group-hover/sidebar:opacity-100 hidden group-hover/sidebar:inline' : 'opacity-100']"
-        >
-          Master Admin
-        </span>
-      </Link>
-
-      <Link 
-        v-if="isMasterAdminPage"
-        href="/crm-selling-panel"
-        title="CRM Selling & Provisioning Panel"
-        class="w-full px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-semibold shadow-xs transition flex items-center justify-center gap-2"
-      >
-        <RocketLaunchIcon class="w-4 h-4 text-white shrink-0" />
-        <span 
-          class="truncate transition-opacity duration-75"
-          :class="[isCollapsed ? 'opacity-0 group-hover/sidebar:opacity-100 hidden group-hover/sidebar:inline' : 'opacity-100']"
-        >
-          CRM Selling Panel
-        </span>
-      </Link>
-
-      <div class="grid grid-cols-2 gap-1.5" :class="[isCollapsed ? 'hidden group-hover/sidebar:grid' : 'grid']">
+      <!-- Master Admin & Selling Panel Action Buttons (STRICTLY Master Admin Panel Only) -->
+      <template v-if="isMasterAdmin && isMasterAdminPage">
         <Link 
-          href="/tenant/settings/navigation"
-          title="Customize Menu"
-          class="px-2.5 py-1.5 bg-slate-50 border border-slate-200 text-slate-700 hover:bg-red-50 hover:border-red-200 hover:text-red-700 rounded-lg text-xs font-medium transition flex items-center justify-center gap-1.5"
+          href="/admin"
+          title="Master Admin Control Panel"
+          :class="[
+            'w-full px-3 py-2 bg-slate-900 text-white hover:bg-slate-800 rounded-xl text-xs font-semibold shadow-xs transition flex items-center justify-center gap-2',
+            isCurrentRoute('/admin') ? 'ring-2 ring-red-500' : ''
+          ]"
         >
-          <AdjustmentsHorizontalIcon class="w-3.5 h-3.5" />
-          <span>Menu</span>
+          <ShieldCheckIcon class="w-4 h-4 text-red-500 shrink-0" />
+          <span 
+            class="truncate transition-opacity duration-75"
+            :class="[isCollapsed ? 'opacity-0 group-hover/sidebar:opacity-100 hidden group-hover/sidebar:inline' : 'opacity-100']"
+          >
+            Master Admin
+          </span>
         </Link>
 
         <Link 
-          href="/settings/session-cookies"
-          title="Sessions & Cookie Management"
-          class="px-2.5 py-1.5 bg-slate-50 border border-slate-200 text-slate-700 hover:bg-slate-100 rounded-lg text-xs font-medium transition flex items-center justify-center gap-1.5"
+          href="/crm-selling-panel"
+          title="CRM Selling & Provisioning Panel"
+          class="w-full px-3 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-semibold shadow-xs transition flex items-center justify-center gap-2"
         >
-          <KeyIcon class="w-3.5 h-3.5" />
-          <span>Sessions</span>
+          <RocketLaunchIcon class="w-4 h-4 text-white shrink-0" />
+          <span 
+            class="truncate transition-opacity duration-75"
+            :class="[isCollapsed ? 'opacity-0 group-hover/sidebar:opacity-100 hidden group-hover/sidebar:inline' : 'opacity-100']"
+          >
+            CRM Selling Panel
+          </span>
+        </Link>
+      </template>
+
+      <div :class="[isCollapsed ? 'hidden group-hover/sidebar:block' : 'block']">
+        <Link 
+          href="/tenant/settings/navigation"
+          title="Customize Menu"
+          class="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 text-slate-700 hover:bg-slate-100 hover:text-slate-900 rounded-lg text-xs font-semibold transition flex items-center justify-center gap-1.5"
+        >
+          <AdjustmentsHorizontalIcon class="w-3.5 h-3.5 text-slate-500" />
+          <span>Customize Menu</span>
         </Link>
       </div>
 
@@ -454,6 +466,15 @@ const resolveIcon = (iconName) => {
     <!-- Global GDPR Cookie Consent Banner -->
     <CookieConsentBanner />
   </aside>
+
+  <!-- Layout Spacer (preserves space in flex containers for the fixed sidebar) -->
+  <div 
+    aria-hidden="true" 
+    :class="[
+      'shrink-0 transition-all duration-300 pointer-events-none hidden md:block',
+      isCollapsed ? 'w-20' : 'w-64'
+    ]"
+  />
 </template>
 
 <style scoped>

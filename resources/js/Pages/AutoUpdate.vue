@@ -1,22 +1,15 @@
 <script setup>
 import { ref, computed } from 'vue';
 import { Head, Link, router, usePage } from '@inertiajs/vue3';
+import Navbar from '@/Components/Navbar.vue';
 import GlobalSearchModal from '@/Components/GlobalSearchModal.vue';
 import { 
-  BellIcon, 
-  HomeIcon, 
-  UserIcon, 
-  SignalIcon, 
-  DocumentTextIcon, 
   ArrowPathIcon,
-  AcademicCapIcon,
-  BriefcaseIcon,
-  UserGroupIcon,
-  GlobeAltIcon,
-  AdjustmentsHorizontalIcon,
   PlayIcon,
   CheckCircleIcon,
-  ExclamationTriangleIcon
+  ExclamationTriangleIcon,
+  ClockIcon,
+  BoltIcon
 } from '@heroicons/vue/24/outline';
 
 const props = defineProps({
@@ -25,11 +18,7 @@ const props = defineProps({
 });
 
 const page = usePage();
-const customNav = computed(() => page.props.custom_nav || {});
-const businessSettings = computed(() => page.props.business_settings || { business_name: 'JRV CRM', business_icon: '♥' });
-
-const getNavLabel = (key, fallback) => customNav.value[key]?.label || fallback;
-const getNavRoute = (key, fallback) => customNav.value[key]?.route || fallback;
+const tenantIndustry = computed(() => page.props.tenant_industry || { name: 'CRM', icon: '⚡', color: 'indigo' });
 
 const isSearchOpen = ref(false);
 
@@ -45,128 +34,88 @@ const runNow = (ruleId) => {
 <template>
   <Head title="Auto Update Automation Engine - JRV CRM" />
 
-  <div class="min-h-screen bg-slate-100 flex font-sans text-slate-900">
-    <!-- Left Vertical Sidebar -->
-    <aside class="w-24 bg-white border-r border-slate-200 flex flex-col items-center py-4 space-y-6 shrink-0 shadow-xs">
-      <Link href="/" class="flex flex-col items-center gap-1 group">
-        <div class="w-12 h-12 bg-red-600 rounded-2xl flex items-center justify-center text-white font-black text-xl shadow-md shadow-red-600/30">
-          {{ businessSettings.business_icon }}
-        </div>
-        <span class="text-[9px] font-black text-red-600 tracking-tighter uppercase text-center px-1 leading-tight line-clamp-1">
-          {{ businessSettings.business_name }}
-        </span>
-      </Link>
-
-      <nav class="flex-1 w-full space-y-3 px-2">
-        <Link :href="getNavRoute('app', '/')" class="flex flex-col items-center justify-center p-2 rounded-xl text-slate-500 hover:bg-slate-100 transition-all text-center">
-          <HomeIcon class="w-5 h-5 text-slate-400" />
-          <span class="text-[9px] font-bold mt-1 leading-tight line-clamp-1">{{ getNavLabel('app', 'App') }}</span>
-        </Link>
-
-        <Link href="/matrimonial/directory" class="flex flex-col items-center justify-center p-2 rounded-xl text-slate-500 hover:bg-slate-100 transition-all text-center">
-          <DocumentTextIcon class="w-5 h-5 text-slate-400" />
-          <span class="text-[9px] font-bold mt-1 leading-tight line-clamp-1">{{ getNavLabel('biodata', 'Biodata') }}</span>
-        </Link>
-
-        <Link href="/broadcast-message" class="flex flex-col items-center justify-center p-2 rounded-xl text-slate-500 hover:bg-slate-100 transition-all text-center">
-          <SignalIcon class="w-5 h-5 text-slate-400" />
-          <span class="text-[9px] font-bold mt-1 leading-tight line-clamp-1">{{ getNavLabel('broadcast', 'BroadCast...') }}</span>
-        </Link>
-
-        <Link href="/online-users" class="flex flex-col items-center justify-center p-2 rounded-xl text-slate-500 hover:bg-slate-100 transition-all text-center">
-          <UserIcon class="w-5 h-5 text-slate-400" />
-          <span class="text-[9px] font-bold mt-1 leading-tight line-clamp-1">{{ getNavLabel('online_user', 'Online User') }}</span>
-        </Link>
-
-        <!-- Active Item: Auto Update -->
-        <Link href="/auto-update" class="flex flex-col items-center justify-center p-2 rounded-xl bg-red-50 text-red-600 font-bold border border-red-200 text-center shadow-xs">
-          <ArrowPathIcon class="w-6 h-6 text-red-600" />
-          <span class="text-[9px] font-black mt-1 leading-tight line-clamp-1">{{ getNavLabel('auto_update', 'Auto Update') }}</span>
-        </Link>
-
-        <Link href="/padhadhikari-directory" class="flex flex-col items-center justify-center p-2 rounded-xl text-slate-500 hover:bg-slate-100 transition-all text-center">
-          <AcademicCapIcon class="w-5 h-5 text-slate-400" />
-          <span class="text-[9px] font-bold mt-1 leading-tight line-clamp-1">{{ getNavLabel('padhadhikari', 'Padhadhikari') }}</span>
-        </Link>
-
-        <Link href="/staff-recruitment" class="flex flex-col items-center justify-center p-2 rounded-xl text-slate-500 hover:bg-slate-100 transition-all text-center">
-          <BriefcaseIcon class="w-5 h-5 text-slate-400" />
-          <span class="text-[9px] font-bold mt-1 leading-tight line-clamp-1">{{ getNavLabel('staff_recruit', 'Staff Recruit') }}</span>
-        </Link>
-
-        <Link href="/employee-management" class="flex flex-col items-center justify-center p-2 rounded-xl text-slate-500 hover:bg-slate-100 transition-all text-center">
-          <UserGroupIcon class="w-5 h-5 text-slate-400" />
-          <span class="text-[9px] font-bold mt-1 leading-tight line-clamp-1">{{ getNavLabel('staff_management', 'Staff Manag...') }}</span>
-        </Link>
-
-        <Link href="/online-users" class="flex flex-col items-center justify-center p-2 rounded-xl text-slate-500 hover:bg-slate-100 transition-all text-center">
-          <GlobeAltIcon class="w-5 h-5 text-slate-400" />
-          <span class="text-[9px] font-bold mt-1 leading-tight line-clamp-1">{{ getNavLabel('universal', 'Universal') }}</span>
-        </Link>
-      </nav>
-    </aside>
+  <div class="flex h-screen bg-slate-50 overflow-hidden font-sans text-slate-900">
+    <!-- Navbar Sidebar -->
+    <Navbar />
 
     <!-- Main Content Area -->
-    <div class="flex-1 flex flex-col min-w-0">
-      <!-- Header -->
-      <header class="bg-white border-b border-slate-200 px-6 py-3 flex items-center justify-between gap-3 shadow-xs">
-        <div></div>
+    <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
+      <!-- Top Bar Header -->
+      <header class="h-16 bg-white border-b border-slate-200 px-6 flex items-center justify-between shrink-0 shadow-2xs">
+        <div class="flex items-center gap-3">
+          <div class="w-9 h-9 bg-slate-900 rounded-xl flex items-center justify-center text-white font-black text-sm shadow-md">
+            <ArrowPathIcon class="w-5 h-5 text-indigo-400" />
+          </div>
+          <div>
+            <h1 class="text-sm font-black text-slate-900 leading-tight">
+              Auto Update & Background Rules
+            </h1>
+            <p class="text-[11px] text-slate-500 font-medium">Automated Trigger Workflows & Sync Schedules</p>
+          </div>
+        </div>
 
         <div class="flex items-center gap-3">
-          <div class="w-9 h-9 bg-red-600 rounded-full flex items-center justify-center text-white font-black text-sm shadow-md">
-            {{ businessSettings.business_icon }}
-          </div>
+          <Link href="/ai-crm-modifier" class="hidden sm:inline-flex px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl shadow-xs items-center gap-1.5 transition">
+            <BoltIcon class="w-4 h-4 text-amber-500" />
+            <span>AI Automation Studio</span>
+          </Link>
         </div>
       </header>
 
-      <!-- Body -->
-      <div class="p-8 space-y-6 flex-1 overflow-y-auto max-w-7xl mx-auto w-full">
-        <div class="border-b border-slate-200 pb-6">
-          <div class="flex items-center gap-2 text-xs font-bold text-red-600 uppercase tracking-wider">
-            <ArrowPathIcon class="w-4 h-4" />
-            <span>Automated Profile Renewal & Sync Engine</span>
+      <!-- Scrollable Body -->
+      <div class="p-6 md:p-8 space-y-6 flex-1 overflow-y-auto max-w-7xl mx-auto w-full">
+        <!-- Hero Header Banner -->
+        <div class="bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950 border border-slate-800 rounded-3xl p-6 md:p-7 text-white shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div class="space-y-1.5 max-w-2xl">
+            <div class="inline-flex items-center gap-2 px-2.5 py-0.5 rounded-md bg-white/10 text-slate-200 text-[10px] font-bold uppercase tracking-wider">
+              <span>{{ tenantIndustry.icon }}</span>
+              <span>{{ tenantIndustry.name }} Automation Engine</span>
+            </div>
+            <h2 class="text-xl md:text-2xl font-black tracking-tight text-white">
+              Auto Update Rules & Trigger Controls
+            </h2>
+            <p class="text-xs text-slate-300">
+              Manage automatic profile updates, renewal alerts, status transitions, and scheduled sync jobs.
+            </p>
           </div>
-          <h1 class="text-3xl font-black tracking-tight text-slate-900 mt-0.5">
-            Auto Update Rules & Trigger Controls
-          </h1>
         </div>
 
         <!-- 4 Summary Metrics Cards -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          <div class="p-6 bg-white rounded-2xl border border-slate-200 shadow-xs space-y-2">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div class="p-5 bg-white rounded-2xl border border-slate-200 shadow-xs space-y-1">
             <div class="text-xs font-bold text-slate-500 uppercase">Active Automation Rules</div>
             <div class="text-3xl font-black text-slate-900">{{ metrics.active_rules }}</div>
             <p class="text-xs text-emerald-600 font-semibold">Running in background</p>
           </div>
 
-          <div class="p-6 bg-white rounded-2xl border border-slate-200 shadow-xs space-y-2">
+          <div class="p-5 bg-white rounded-2xl border border-slate-200 shadow-xs space-y-1">
             <div class="text-xs font-bold text-slate-500 uppercase">Processed Today</div>
             <div class="text-3xl font-black text-emerald-600">{{ metrics.processed_today }}</div>
-            <p class="text-xs text-emerald-600 font-semibold">Bio-datas updated</p>
+            <p class="text-xs text-emerald-600 font-semibold">Records updated</p>
           </div>
 
-          <div class="p-6 bg-white rounded-2xl border border-slate-200 shadow-xs space-y-2">
+          <div class="p-5 bg-white rounded-2xl border border-slate-200 shadow-xs space-y-1">
             <div class="text-xs font-bold text-slate-500 uppercase">Pending Reminders</div>
             <div class="text-3xl font-black text-amber-600">{{ metrics.pending_reminders }}</div>
             <p class="text-xs text-amber-600 font-semibold">Queued for delivery</p>
           </div>
 
-          <div class="p-6 bg-white rounded-2xl border border-slate-200 shadow-xs space-y-2">
+          <div class="p-5 bg-white rounded-2xl border border-slate-200 shadow-xs space-y-1">
             <div class="text-xs font-bold text-slate-500 uppercase">System Sync Health</div>
-            <div class="text-3xl font-black text-rose-600">{{ metrics.system_health }}</div>
-            <p class="text-xs text-rose-600 font-semibold">No sync errors detected</p>
+            <div class="text-3xl font-black text-indigo-600">{{ metrics.system_health }}</div>
+            <p class="text-xs text-indigo-600 font-semibold">No sync errors detected</p>
           </div>
         </div>
 
         <!-- Rules Grid -->
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div v-for="rule in rules" :key="rule.id" class="bg-white border border-slate-200 rounded-3xl p-6 shadow-xs space-y-4 flex flex-col justify-between">
+          <div v-for="rule in rules" :key="rule.id" class="bg-white border border-slate-200 hover:border-slate-300 rounded-3xl p-6 shadow-xs space-y-4 flex flex-col justify-between transition-all">
             <div class="space-y-2">
               <div class="flex items-center justify-between">
-                <span class="text-xs font-black text-red-600 uppercase tracking-wider bg-red-50 px-2.5 py-0.5 rounded-full border border-red-200">
+                <span class="text-xs font-black text-slate-700 uppercase tracking-wider bg-slate-100 px-2.5 py-0.5 rounded-md">
                   {{ rule.frequency }} Trigger
                 </span>
-                <button @click="toggleRule(rule.id)" :class="['w-10 h-5 rounded-full p-0.5 transition-colors flex items-center', rule.is_active ? 'bg-emerald-600 justify-end' : 'bg-slate-300 justify-start']">
+                <button @click="toggleRule(rule.id)" :class="['w-10 h-5 rounded-full p-0.5 transition-colors flex items-center cursor-pointer', rule.is_active ? 'bg-emerald-600 justify-end' : 'bg-slate-300 justify-start']">
                   <div class="w-4 h-4 rounded-full bg-white shadow-xs"></div>
                 </button>
               </div>
@@ -178,9 +127,9 @@ const runNow = (ruleId) => {
 
             <div class="pt-4 border-t border-slate-100 flex items-center justify-between text-xs">
               <div class="text-slate-500 font-semibold">
-                Processed: <span class="font-black text-slate-900">{{ rule.processed_count }}</span> profiles
+                Processed: <span class="font-black text-slate-900">{{ rule.processed_count }}</span> records
               </div>
-              <button @click="runNow(rule.id)" class="px-3.5 py-1.5 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl shadow-xs flex items-center gap-1.5 transition-all">
+              <button @click="runNow(rule.id)" class="px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl shadow-xs flex items-center gap-1.5 transition-all cursor-pointer">
                 <PlayIcon class="w-3.5 h-3.5 fill-white" />
                 <span>Run Trigger Now</span>
               </button>

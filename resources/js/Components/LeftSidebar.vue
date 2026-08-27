@@ -84,7 +84,7 @@ const isCurrentRoute = (path) => {
 </script>
 
 <template>
-  <aside class="w-24 bg-white border-r border-slate-200 flex flex-col items-center py-4 space-y-6 shrink-0 shadow-xs z-30 min-h-screen">
+  <aside class="fixed top-0 left-0 bottom-0 h-screen w-24 bg-white border-r border-slate-200 flex flex-col items-center py-4 space-y-6 shrink-0 shadow-xs z-30 overflow-y-auto">
     <!-- Logo -->
     <Link href="/" class="flex flex-col items-center gap-1 group">
       <div class="w-12 h-12 bg-red-600 rounded-2xl flex items-center justify-center text-white font-black text-xl shadow-md shadow-red-600/30">
@@ -115,6 +115,9 @@ const isCurrentRoute = (path) => {
       </template>
     </nav>
   </aside>
+
+  <!-- Layout Spacer -->
+  <div aria-hidden="true" class="w-24 shrink-0 pointer-events-none hidden md:block" />
 </template>
 
 <style scoped>

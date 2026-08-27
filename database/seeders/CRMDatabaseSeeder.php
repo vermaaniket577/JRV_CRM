@@ -39,16 +39,15 @@ class CRMDatabaseSeeder extends Seeder
 
         // 2. Create Customizable Navigation Items
         $navItems = [
-            ['key' => 'app', 'label' => 'App', 'route' => '/', 'icon' => 'HomeIcon', 'display_order' => 1],
-            ['key' => 'broadcast', 'label' => 'BroadCast Message', 'route' => '/broadcast-message', 'icon' => 'SignalIcon', 'display_order' => 2],
-            ['key' => 'online_user', 'label' => 'Online User', 'route' => '/online-users', 'icon' => 'UserIcon', 'display_order' => 3],
-            ['key' => 'biodata', 'label' => 'Biodata', 'route' => '/matrimonial/directory', 'icon' => 'DocumentTextIcon', 'display_order' => 4],
-            ['key' => 'auto_update', 'label' => 'Auto Update', 'route' => '/auto-update', 'icon' => 'ArrowPathIcon', 'display_order' => 5],
-            ['key' => 'padhadhikari', 'label' => 'Padhadhikari', 'route' => '/padhadhikari-directory', 'icon' => 'AcademicCapIcon', 'display_order' => 6],
-            ['key' => 'staff_recruit', 'label' => 'Staff Recruit', 'route' => '/staff-recruitment', 'icon' => 'BriefcaseIcon', 'display_order' => 7],
-            ['key' => 'staff_management', 'label' => 'Staff Management', 'route' => '/employee-management', 'icon' => 'UserGroupIcon', 'display_order' => 8],
-            ['key' => 'task_dashboard', 'label' => 'Task Dashboard', 'route' => '/task-dashboard', 'icon' => 'ClipboardDocumentListIcon', 'display_order' => 9],
-            ['key' => 'universal', 'label' => 'Universal Data', 'route' => '/online-users', 'icon' => 'GlobeAltIcon', 'display_order' => 10],
+            ['key' => 'broadcast', 'label' => 'BroadCast Message', 'route' => '/broadcast-message', 'icon' => 'SignalIcon', 'display_order' => 1],
+            ['key' => 'online_user', 'label' => 'Online User', 'route' => '/online-users', 'icon' => 'UserIcon', 'display_order' => 2],
+            ['key' => 'auto_update', 'label' => 'Auto Update', 'route' => '/auto-update', 'icon' => 'ArrowPathIcon', 'display_order' => 3],
+            ['key' => 'staff_recruit', 'label' => 'Staff Recruit', 'route' => '/staff-recruitment', 'icon' => 'BriefcaseIcon', 'display_order' => 4],
+            ['key' => 'staff_management', 'label' => 'Staff Management', 'route' => '/employee-management', 'icon' => 'UserGroupIcon', 'display_order' => 5],
+            ['key' => 'task_dashboard', 'label' => 'Task Dashboard', 'route' => '/task-dashboard', 'icon' => 'ClipboardDocumentListIcon', 'display_order' => 6],
+            ['key' => 'universal', 'label' => 'Universal Data', 'route' => '/online-users', 'icon' => 'GlobeAltIcon', 'display_order' => 7],
+            ['key' => 'data_import', 'label' => 'Data Import Hub', 'route' => '/data-import', 'icon' => 'TableCellsIcon', 'display_order' => 8],
+            ['key' => 'ai_crm', 'label' => 'AI CRM Studio', 'route' => '/ai-crm-modifier', 'icon' => 'SparklesIcon', 'display_order' => 9],
         ];
 
         foreach ($navItems as $item) {

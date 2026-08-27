@@ -21,6 +21,9 @@ use App\Http\Controllers\PadhadhikariController;
 use App\Http\Controllers\PaymentPlanController;
 use App\Http\Controllers\PropertyController;
 use App\Http\Controllers\StaffRecruitmentController;
+use App\Http\Controllers\DataImportController;
+use App\Http\Controllers\AiCrmModifierController;
+use App\Http\Controllers\CompanyController;
 use App\Http\Controllers\TaskController;
 use App\Http\Controllers\TaskDashboardController;
 use App\Http\Controllers\Tenant\NavigationCustomizerController;
@@ -178,6 +181,16 @@ Route::prefix('staff-recruitment')->name('recruitment.')->group(function () {
     Route::post('/applications/{application}/stage', [StaffRecruitmentController::class, 'updateStage'])->name('applications.stage');
 });
 
+// Universal Data Import Center Routes (Excel / CSV & External Database)
+Route::prefix('data-import')->name('data-import.')->group(function () {
+    Route::get('/', [DataImportController::class, 'index'])->name('index');
+    Route::post('/excel', [DataImportController::class, 'importExcel'])->name('excel');
+    Route::post('/database-test', [DataImportController::class, 'testDatabase'])->name('database.test');
+    Route::post('/database-sync', [DataImportController::class, 'importDatabase'])->name('database.sync');
+    Route::get('/sample/{entity}', [DataImportController::class, 'downloadSample'])->name('sample');
+    Route::post('/demo-seed', [DataImportController::class, 'seedHealthcareDemo'])->name('demo-seed');
+});
+
 // Matrimonial & Community Directory Bio-Data Routes
 Route::prefix('matrimonial')->name('matrimonial.')->group(function () {
     Route::get('/', [MemberController::class, 'index'])->name('index');
@@ -202,7 +215,13 @@ Route::get('/global-search', GlobalSearchController::class)->name('global-search
 // Industry Module Routes (Preventing 404 Errors)
 Route::get('/leads', [CrmSalesPanelController::class, 'index'])->name('leads.index');
 Route::get('/contacts', [OnlineUserController::class, 'index'])->name('contacts.index');
-Route::get('/companies', [CrmSellingPanelController::class, 'index'])->name('companies.index');
+
+Route::prefix('companies')->name('companies.')->group(function () {
+    Route::get('/', [CompanyController::class, 'index'])->name('index');
+    Route::post('/', [CompanyController::class, 'store'])->name('store');
+    Route::put('/{company}', [CompanyController::class, 'update'])->name('update');
+    Route::delete('/{company}', [CompanyController::class, 'destroy'])->name('destroy');
+});
 
 // Education & Training Modules
 Route::get('/courses', [TenantDatabaseManagerController::class, 'index'])->name('courses.index');
@@ -273,6 +292,24 @@ Route::get('/padhadhikari', [PadhadhikariController::class, 'index'])->name('pad
 Route::get('/broadcast', [BroadcastMessageController::class, 'index'])->name('broadcast.direct');
 Route::get('/recruitment', [StaffRecruitmentController::class, 'index'])->name('recruitment.direct');
 Route::get('/settings', [SystemSettingController::class, 'index'])->name('settings.direct');
+
+// AI CRM Studio & Workflow Modifier (Paid Users Feature)
+Route::prefix('ai-crm-modifier')->name('ai.crm.modifier.')->group(function () {
+    Route::get('/', [AiCrmModifierController::class, 'index'])->name('index');
+    Route::post('/generate', [AiCrmModifierController::class, 'generate'])->name('generate');
+    Route::post('/apply', [AiCrmModifierController::class, 'apply'])->name('apply');
+    Route::post('/activate-paid', [AiCrmModifierController::class, 'activatePaid'])->name('activate-paid');
+});
+
+// Universal Data Import Hub (Excel & Database)
+Route::prefix('data-import')->name('data-import.')->group(function () {
+    Route::get('/', [DataImportController::class, 'index'])->name('index');
+    Route::post('/excel', [DataImportController::class, 'importExcel'])->name('excel');
+    Route::post('/database-test', [DataImportController::class, 'testDatabaseConnection'])->name('database-test');
+    Route::post('/database-sync', [DataImportController::class, 'syncDatabaseTable'])->name('database-sync');
+    Route::get('/sample/{entity}', [DataImportController::class, 'downloadSample'])->name('sample');
+    Route::post('/demo-seed', [DataImportController::class, 'seedHealthcareDemo'])->name('demo-seed');
+});
 
 Route::prefix('deals')->name('deals.')->group(function () {
     Route::get('/', [DealController::class, 'index'])->name('index');

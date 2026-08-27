@@ -75,13 +75,13 @@ class NavigationCustomizerController extends Controller
         ]);
 
         if (array_key_exists('business_name', $validated)) {
-            TenantSetting::setByKey('business_name', $validated['business_name']);
+            TenantSetting::setByKey('business_name', $validated['business_name'], $tenantId);
         }
         if (array_key_exists('business_icon', $validated)) {
-            TenantSetting::setByKey('business_icon', $validated['business_icon']);
+            TenantSetting::setByKey('business_icon', $validated['business_icon'], $tenantId);
         }
         if (array_key_exists('brand_color', $validated)) {
-            TenantSetting::setByKey('brand_color', $validated['brand_color']);
+            TenantSetting::setByKey('brand_color', $validated['brand_color'], $tenantId);
         }
 
         if (!empty($validated['deleted_ids'])) {

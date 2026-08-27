@@ -46,7 +46,7 @@ class StaffRecruitmentController extends Controller
             'status' => 'Active',
         ]));
 
-        return redirect()->back()->with('success', "New staff position '{$validated['title']}' posted successfully.");
+        return redirect()->back()->with('success', "Medical vacancy '{$validated['title']}' posted successfully.");
     }
 
     public function updateStage(Request $request, JobApplication $application): RedirectResponse
@@ -59,6 +59,6 @@ class StaffRecruitmentController extends Controller
             'stage' => $validated['stage'],
         ]);
 
-        return redirect()->back()->with('success', 'Candidate hiring pipeline stage updated.');
+        return redirect()->back()->with('success', 'Medical candidate credential & hiring pipeline stage updated.');
     }
 }

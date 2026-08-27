@@ -178,34 +178,6 @@ const getStageLeads = (stage) => {
             </span>
           </button>
         </nav>
-
-        <!-- Sidebar Promo Card -->
-        <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2">
-          <div class="flex items-center gap-2 text-slate-900 font-bold text-xs">
-            <SparklesIcon class="w-4 h-4 text-red-600 shrink-0" />
-            <span 
-              class="truncate transition-opacity duration-75"
-              :class="[isSubSidebarCollapsed ? 'opacity-0 group-hover/subsidebar:opacity-100 hidden group-hover/subsidebar:inline' : 'opacity-100']"
-            >
-              SaaS Engine Active
-            </span>
-          </div>
-          <p 
-            class="text-[11px] text-slate-500 font-medium leading-normal transition-opacity duration-75"
-            :class="[isSubSidebarCollapsed ? 'opacity-0 group-hover/subsidebar:opacity-100 hidden group-hover/subsidebar:block' : 'opacity-100']"
-          >
-            Multi-Industry provisioner ready to launch client workspaces.
-          </p>
-          <Link href="/crm-selling-panel" class="w-full py-2 bg-slate-900 hover:bg-slate-800 text-white text-[11px] font-extrabold rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-xs">
-            <RocketLaunchIcon class="w-3.5 h-3.5 text-red-500" />
-            <span 
-              class="truncate transition-opacity duration-75"
-              :class="[isSubSidebarCollapsed ? 'opacity-0 group-hover/subsidebar:opacity-100 hidden group-hover/subsidebar:inline' : 'opacity-100']"
-            >
-              Launch Instance
-            </span>
-          </Link>
-        </div>
       </aside>
 
       <!-- MAIN CONTENT WINDOW -->

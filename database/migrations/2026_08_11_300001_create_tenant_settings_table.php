@@ -11,9 +11,11 @@ return new class extends Migration
         Schema::create('tenant_settings', function (Blueprint $table) {
             $table->id();
             $table->foreignId('tenant_id')->nullable()->constrained('tenants')->cascadeOnDelete();
-            $table->string('key')->unique();
+            $table->string('key');
             $table->text('value')->nullable();
             $table->timestamps();
+
+            $table->unique(['tenant_id', 'key']);
         });
     }
 

@@ -112,36 +112,99 @@ class SidebarModulesSeeder extends Seeder
             'responsibilities' => 'NRI Community Directory Operations & International Conventions.',
         ]);
 
-        // 4. Seed Job Postings & Applications
-        $job = JobPosting::create([
-            'title' => 'Senior Community Counselor & Matchmaker',
-            'department' => 'Counseling & Matchmaking',
-            'location' => 'San Francisco, CA',
+        // 4. Seed Healthcare Job Postings & Applications
+        $cardiologistJob = JobPosting::create([
+            'title' => 'Senior Consultant Cardiologist & Interventional Specialist',
+            'department' => 'Cardiology & Heart Care',
+            'location' => 'Metro General Hospital, New York, NY',
             'employment_type' => 'Full-Time',
-            'salary_min' => 45000.00,
-            'salary_max' => 70000.00,
+            'salary_min' => 180000.00,
+            'salary_max' => 260000.00,
             'status' => 'Active',
-            'description' => 'Direct matchmaker responsible for member consultations and Gotra verification.',
+            'description' => 'Lead inpatient and outpatient clinical cardiology rounds, catheterization procedures, and diagnostic echocardiograms.',
+        ]);
+
+        $icuNurseJob = JobPosting::create([
+            'title' => 'Head of Critical Care Nursing (ICU Lead)',
+            'department' => 'Emergency & Intensive Care (ICU)',
+            'location' => 'St. Jude Medical Center, Chicago, IL',
+            'employment_type' => 'Full-Time',
+            'salary_min' => 85000.00,
+            'salary_max' => 120000.00,
+            'status' => 'Active',
+            'description' => 'Manage critical care nursing staff, trauma triage, ventilator management, and ICU patient monitoring protocols.',
+        ]);
+
+        $radiologistJob = JobPosting::create([
+            'title' => 'Consultant Radiologist & Diagnostic Imaging Specialist',
+            'department' => 'Radiology & Diagnostics',
+            'location' => 'HealthFirst Specialty Clinic, Boston, MA',
+            'employment_type' => 'Full-Time',
+            'salary_min' => 160000.00,
+            'salary_max' => 220000.00,
+            'status' => 'Active',
+            'description' => 'Interpretation of MRI, CT scans, ultrasound imaging, and interventional radiology clinical consultations.',
+        ]);
+
+        $erDoctorJob = JobPosting::create([
+            'title' => 'Emergency Room Physician (ER / Trauma)',
+            'department' => 'Emergency Medicine',
+            'location' => 'City Central Hospital, San Francisco, CA',
+            'employment_type' => 'Full-Time',
+            'salary_min' => 150000.00,
+            'salary_max' => 210000.00,
+            'status' => 'Active',
+            'description' => 'Triage, acute trauma resuscitation, emergency airway management, and urgent clinical admissions.',
         ]);
 
         JobApplication::create([
-            'job_posting_id' => $job->id,
-            'applicant_name' => 'Pooja Agarwal',
-            'email' => 'pooja.agarwal@example.com',
-            'phone' => '+1 (555) 987-6543',
-            'experience_years' => '5+ years',
+            'job_posting_id' => $cardiologistJob->id,
+            'applicant_name' => 'Dr. Aarav Mehta, MD',
+            'email' => 'aarav.mehta@healthmed.org',
+            'phone' => '+1 (555) 234-7890',
+            'experience_years' => '8+ years',
             'stage' => 'Interview Scheduled',
-            'notes' => 'Strong background in community directory counseling.',
+            'notes' => 'Board certified in Cardiovascular Disease. Fellowship completed at Johns Hopkins.',
         ]);
 
         JobApplication::create([
-            'job_posting_id' => $job->id,
-            'applicant_name' => 'Vikram Shah',
-            'email' => 'vikram.shah@example.com',
-            'phone' => '+1 (555) 456-7890',
-            'experience_years' => '3 years',
+            'job_posting_id' => $icuNurseJob->id,
+            'applicant_name' => 'Nurse Sarah Jenkins, BSN, RN',
+            'email' => 's.jenkins@nursingcare.com',
+            'phone' => '+1 (555) 876-5432',
+            'experience_years' => '6 years',
+            'stage' => 'Offer Sent',
+            'notes' => 'CCRN certified with 6 years level-1 trauma and ICU ECMO experience.',
+        ]);
+
+        JobApplication::create([
+            'job_posting_id' => $radiologistJob->id,
+            'applicant_name' => 'Dr. Priya Sharma, MBBS, MD',
+            'email' => 'priya.sharma@medclinics.org',
+            'phone' => '+1 (555) 345-6789',
+            'experience_years' => '7 years',
+            'stage' => 'Interview Scheduled',
+            'notes' => 'Subspecialty in Neuro-imaging and 3T MRI diagnostic interpretation.',
+        ]);
+
+        JobApplication::create([
+            'job_posting_id' => $erDoctorJob->id,
+            'applicant_name' => 'Dr. David Chen, MD',
+            'email' => 'david.chen@erhealth.org',
+            'phone' => '+1 (555) 654-3210',
+            'experience_years' => '4 years',
             'stage' => 'Screening',
-            'notes' => 'Experienced in background verification and ID document review.',
+            'notes' => 'ATLS and ACLS certified with extensive ER triage and resuscitation background.',
+        ]);
+
+        JobApplication::create([
+            'job_posting_id' => $icuNurseJob->id,
+            'applicant_name' => 'Nurse Elena Rostova, BSN',
+            'email' => 'elena.r@healthcare.net',
+            'phone' => '+1 (555) 789-0123',
+            'experience_years' => '5 years',
+            'stage' => 'Hired',
+            'notes' => 'Experienced in cardiac post-operative ICU care and patient telemetry.',
         ]);
     }
 }

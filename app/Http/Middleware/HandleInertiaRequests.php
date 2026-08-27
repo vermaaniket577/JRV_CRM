@@ -94,11 +94,32 @@ class HandleInertiaRequests extends Middleware
                 ->unique('label')
                 ->sortBy('display_order');
 
+            $isMasterAdmin = (bool) ($user && $user->is_super_admin);
+
+            // If user is not Master Admin, filter out all master admin items
+            if (!$isMasterAdmin) {
+                $masterAdminKeys = ['manage_plans', 'paid_users', 'crm_selling', 'crm_sales', 'admin_panel', 'system_settings'];
+                $items = $items->reject(function ($item) use ($masterAdminKeys) {
+                    return in_array($item->key, $masterAdminKeys) 
+                        || str_starts_with($item->route, '/admin') 
+                        || str_starts_with($item->route, '/crm-selling-panel') 
+                        || str_starts_with($item->route, '/crm-sales-panel');
+                });
+            }
+
+            // Filter out redundant 'App' duplicate and 'Padhadhikari' from all CRM sectors
+            $items = $items->reject(function ($item) {
+                return in_array($item->key, ['app', 'padhadhikari'])
+                    || ($item->label === 'App' && ($item->route === '/' || $item->route === '/app'))
+                    || str_contains(strtolower($item->label ?? ''), 'padhadhikari') 
+                    || str_contains(strtolower($item->route ?? ''), 'padhadhikari');
+            });
+
             // If current industry is NOT matrimonial, filter out matrimonial-specific items
             if ($currentIndustrySlug !== 'matrimonial') {
-                $matrimonialKeys = ['biodata', 'verified_members', 'shortlist', 'padhadhikari'];
+                $matrimonialKeys = ['biodata', 'verified_members', 'shortlist'];
                 $items = $items->reject(function ($item) use ($matrimonialKeys) {
-                    return in_array($item->key, $matrimonialKeys) || str_contains($item->route, 'matrimonial') || str_contains($item->route, 'padhadhikari');
+                    return in_array($item->key, $matrimonialKeys) || str_contains($item->route, 'matrimonial');
                 });
             }
 
@@ -122,8 +143,17 @@ class HandleInertiaRequests extends Middleware
             $storageUsedGb = round($storageUsedMb / 1024, 2);
             $storageLimitGb = round($storageLimitMb / 1024, 1);
             $storagePercent = min(100, round(($storageUsedMb / $storageLimitMb) * 100));
+            $isPaidUser = (bool) (
+                TenantSetting::getByKey('is_paid_plan', 'false', $tenantId) === 'true' ||
+                in_array(TenantSetting::getByKey('subscription_tier', 'free', $tenantId), ['starter', 'growth', 'enterprise', 'custom', 'pro']) ||
+                (isset($tenant) && $tenant && $tenant->subscription && $tenant->subscription->payment_status === 'paid')
+            );
+            $subscriptionTier = TenantSetting::getByKey('subscription_tier', $isPaidUser ? 'Growth Pro' : 'Free Trial', $tenantId);
         } catch (\Exception $e) {
             // Fallback default settings
+            $isMasterAdmin = false;
+            $isPaidUser = false;
+            $subscriptionTier = 'Free Trial';
             $storageLimitMb = 5120;
             $storageUsedMb = 1250.0;
             $storageUsedGb = 1.22;
@@ -134,7 +164,11 @@ class HandleInertiaRequests extends Middleware
         return array_merge(parent::share($request), [
             'auth' => [
                 'user' => $request->user(),
+                'is_master_admin' => $isMasterAdmin ?? false,
+                'is_paid_user' => $isPaidUser ?? false,
             ],
+            'is_paid_user' => $isPaidUser ?? false,
+            'subscription_tier' => $subscriptionTier ?? 'Free Trial',
             'current_tenant' => (isset($tenant) && $tenant) ? [
                 'id' => $tenant->id,
                 'name' => $tenant->name,

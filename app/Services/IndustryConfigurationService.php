@@ -99,9 +99,9 @@ class IndustryConfigurationService
      */
     private function provisionSettings(Tenant $tenant, Industry $industry): void
     {
-        TenantSetting::setByKey('industry_name', $industry->name);
-        TenantSetting::setByKey('industry_slug', $industry->slug);
-        TenantSetting::setByKey('industry_color', $industry->color);
+        TenantSetting::setByKey('industry_name', $industry->name, $tenant->id);
+        TenantSetting::setByKey('industry_slug', $industry->slug, $tenant->id);
+        TenantSetting::setByKey('industry_color', $industry->color, $tenant->id);
     }
 
     /**
