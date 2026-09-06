@@ -145,6 +145,69 @@ class IndustrySeeder extends Seeder
                 ]
             ],
 
+            // ========== RESEARCH JOURNAL & PAPER PUBLICATION ==========
+            [
+                'name' => 'Research Journal & Paper Publication',
+                'slug' => 'research-publication',
+                'icon' => '📑',
+                'description' => 'Academic journals, research papers, peer review tracking, manuscript submissions, Scopus & UGC Care publishing',
+                'color' => 'indigo',
+                'business_types' => [
+                    ['name' => 'Peer-Reviewed Academic Journal', 'slug' => 'peer-reviewed-journal', 'description' => 'Double-blind peer-reviewed scientific journals'],
+                    ['name' => 'Scopus & WoS Indexed Journal', 'slug' => 'scopus-wos-journal', 'description' => 'High-impact indexed research journals'],
+                    ['name' => 'UGC CARE Listed Journal', 'slug' => 'ugc-care-journal', 'description' => 'University Grants Commission approved publications'],
+                    ['name' => 'Conference Proceedings & Volumes', 'slug' => 'conference-proceedings', 'description' => 'National & international research conferences'],
+                    ['name' => 'Open Access Academic Publisher', 'slug' => 'open-access-publisher', 'description' => 'Gold/Diamond open-access research repositories'],
+                    ['name' => 'Book, Thesis & Monograph Publishing', 'slug' => 'thesis-monograph', 'description' => 'PhD dissertations, academic books, and chapters'],
+                ],
+                'modules' => [
+                    ['key' => 'dashboard', 'label' => 'Editorial Dashboard', 'icon' => 'ChartBarIcon', 'route' => '/'],
+                    ['key' => 'manuscripts', 'label' => 'Paper Submissions', 'icon' => 'DocumentTextIcon', 'route' => '/tenant/crm-records?type=manuscripts'],
+                    ['key' => 'authors', 'label' => 'Authors & Researchers', 'icon' => 'UserGroupIcon', 'route' => '/contacts'],
+                    ['key' => 'journals', 'label' => 'Journals & Issues', 'icon' => 'BookOpenIcon', 'route' => '/tenant/crm-records?type=journals'],
+                    ['key' => 'reviewers', 'label' => 'Peer Reviewers', 'icon' => 'ShieldCheckIcon', 'route' => '/tenant/crm-records?type=reviewers'],
+                    ['key' => 'pipeline', 'label' => 'Review Pipeline', 'icon' => 'Square3Stack3DIcon', 'route' => '/deals'],
+                    ['key' => 'apc_fees', 'label' => 'APC & Invoices', 'icon' => 'CurrencyRupeeIcon', 'route' => '/payment-plans'],
+                    ['key' => 'auto_update', 'label' => 'Auto Rules & Alerts', 'icon' => 'ArrowPathIcon', 'route' => '/auto-update'],
+                    ['key' => 'data_import', 'label' => 'Import Manuscripts', 'icon' => 'TableCellsIcon', 'route' => '/data-import'],
+                    ['key' => 'ai_crm', 'label' => 'AI CRM Studio', 'icon' => 'SparklesIcon', 'route' => '/ai-crm-modifier'],
+                ],
+                'pipeline' => [
+                    'name' => 'Manuscript Peer Review Pipeline',
+                    'stages' => [
+                        ['name' => 'Manuscript Submitted', 'probability' => 10, 'type' => 'open'],
+                        ['name' => 'Plagiarism Check Passed', 'probability' => 25, 'type' => 'open'],
+                        ['name' => 'Assigned to Reviewers', 'probability' => 40, 'type' => 'open'],
+                        ['name' => 'Under Peer Review', 'probability' => 55, 'type' => 'open'],
+                        ['name' => 'Revision Submitted', 'probability' => 70, 'type' => 'open'],
+                        ['name' => 'Accepted for Publication', 'probability' => 85, 'type' => 'open'],
+                        ['name' => 'APC / Fee Payment Received', 'probability' => 95, 'type' => 'open'],
+                        ['name' => 'Published & DOI Assigned', 'probability' => 100, 'type' => 'won'],
+                        ['name' => 'Manuscript Rejected / Withdrawn', 'probability' => 0, 'type' => 'lost'],
+                    ]
+                ],
+                'fields' => [
+                    ['key' => 'paper_title', 'label' => 'Manuscript / Paper Title', 'type' => 'text', 'module' => 'leads', 'required' => true],
+                    ['key' => 'manuscript_id', 'label' => 'Paper ID / Tracking No.', 'type' => 'text', 'module' => 'leads'],
+                    ['key' => 'target_journal', 'label' => 'Target Journal', 'type' => 'dropdown', 'module' => 'leads', 'options' => ['Intl Journal of Recent Research', 'Scopus Index Engineering Journal', 'UGC CARE Approved Journal', 'Medical & Pharma Research Journal', 'Other']],
+                    ['key' => 'author_affiliation', 'label' => 'University / Institution', 'type' => 'text', 'module' => 'leads'],
+                    ['key' => 'research_domain', 'label' => 'Research Track / Domain', 'type' => 'dropdown', 'module' => 'leads', 'options' => ['Computer Science & AI', 'Electrical & Electronics', 'Mechanical Engineering', 'Medical & Health Sciences', 'Management & Commerce', 'Humanities & Social Sciences']],
+                    ['key' => 'similarity_percentage', 'label' => 'Plagiarism Similarity (%)', 'type' => 'number', 'module' => 'leads'],
+                    ['key' => 'assigned_reviewer', 'label' => 'Assigned Reviewer', 'type' => 'text', 'module' => 'leads'],
+                    ['key' => 'review_decision', 'label' => 'Review Decision', 'type' => 'dropdown', 'module' => 'leads', 'options' => ['Under Review', 'Accepted', 'Minor Revision', 'Major Revision', 'Rejected']],
+                    ['key' => 'apc_amount', 'label' => 'APC / Publication Fee', 'type' => 'currency', 'module' => 'leads'],
+                    ['key' => 'doi_number', 'label' => 'DOI / ISSN Number', 'type' => 'text', 'module' => 'leads'],
+                ],
+                'widgets' => [
+                    ['key' => 'total_submissions', 'label' => 'Total Manuscripts', 'type' => 'stat', 'cols' => 1, 'config' => ['model' => 'leads', 'aggregate' => 'count', 'icon' => '📑', 'color' => 'indigo']],
+                    ['key' => 'under_review', 'label' => 'Under Peer Review', 'type' => 'stat', 'cols' => 1, 'config' => ['model' => 'leads', 'aggregate' => 'count', 'filter' => 'stage:Under Peer Review', 'icon' => '🔍', 'color' => 'amber']],
+                    ['key' => 'accepted_papers', 'label' => 'Accepted Manuscripts', 'type' => 'stat', 'cols' => 1, 'config' => ['model' => 'leads', 'aggregate' => 'count', 'filter' => 'stage:Accepted for Publication', 'icon' => '✅', 'color' => 'emerald']],
+                    ['key' => 'apc_revenue', 'label' => 'Total APC Revenue', 'type' => 'stat', 'cols' => 1, 'config' => ['model' => 'deals', 'aggregate' => 'sum', 'field' => 'value', 'icon' => '💰', 'color' => 'green']],
+                    ['key' => 'published_papers', 'label' => 'Published with DOI', 'type' => 'stat', 'cols' => 1, 'config' => ['model' => 'leads', 'aggregate' => 'count', 'filter' => 'stage:Published & DOI Assigned', 'icon' => '🏆', 'color' => 'sky']],
+                    ['key' => 'acceptance_rate', 'label' => 'Acceptance Rate', 'type' => 'stat', 'cols' => 1, 'config' => ['aggregate' => 'conversion_rate', 'icon' => '📈', 'color' => 'violet']],
+                ]
+            ],
+
             // ========== 1. EDUCATION (FULLY CONFIGURED) ==========
             [
                 'name' => 'Education & Training',

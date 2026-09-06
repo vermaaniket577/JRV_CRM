@@ -197,11 +197,18 @@ class HandleInertiaRequests extends Middleware
                 'analytics' => $request->cookie('crm_analytics_consent', 'true') === 'true',
                 'marketing' => $request->cookie('crm_marketing_consent', 'false') === 'true',
                 'sidebar_collapsed' => $request->cookie('crm_sidebar_collapsed', 'false') === 'true',
+                'total_cookies' => count($request->cookies->all()),
             ],
             'session_info' => [
-                'driver' => config('session.driver', 'file'),
+                'id' => substr($request->session()->getId(), 0, 8) . '...',
+                'driver' => config('session.driver', 'database'),
                 'ip' => $request->ip(),
                 'user_agent' => $request->header('User-Agent'),
+                'active_sessions_count' => \Illuminate\Support\Facades\Schema::hasTable('sessions')
+                    ? ($request->user() 
+                        ? \Illuminate\Support\Facades\DB::table('sessions')->where('user_id', $request->user()->id)->count()
+                        : 1)
+                    : 1,
             ],
             'flash' => [
                 'success' => fn () => $request->session()->get('success'),

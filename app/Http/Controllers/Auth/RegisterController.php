@@ -14,6 +14,8 @@ use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
 
+use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
+
 class RegisterController extends Controller
 {
     public function showRegistrationForm(): Response
@@ -21,7 +23,7 @@ class RegisterController extends Controller
         return Inertia::render('Auth/Register');
     }
 
-    public function register(Request $request, TenantDatabaseService $dbService): RedirectResponse
+    public function register(Request $request, TenantDatabaseService $dbService): SymfonyResponse
     {
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
@@ -71,6 +73,20 @@ class RegisterController extends Controller
 
         session(['tenant_id' => $tenant->id]);
 
-        return redirect('/onboarding')->with('success', "Workspace and dedicated database provisioned for {$tenant->name} ({$tenant->subdomain})!");
+        // Generate secure short-lived transfer token for seamless authentication on the subdomain
+        $authToken = Str::random(40);
+        \Illuminate\Support\Facades\Cache::put("subdomain_auth_{$authToken}", $user->id, now()->addMinutes(5));
+
+        // Directly land on the subdomain URL (e.g. http://unlockrentals.localhost:8000/)
+        $subdomainTargetUrl = $tenant->getSubdomainUrl('/', [
+            'auth_token' => $authToken,
+            'onboarding_success' => 1,
+        ]);
+
+        if ($request->header('X-Inertia')) {
+            return Inertia::location($subdomainTargetUrl);
+        }
+
+        return redirect()->away($subdomainTargetUrl);
     }
 }

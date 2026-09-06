@@ -4,6 +4,7 @@ import { usePage, Link } from '@inertiajs/vue3';
 import GlobalSearchModal from '@/Components/GlobalSearchModal.vue';
 import FreeTrialUpgradeModal from '@/Components/FreeTrialUpgradeModal.vue';
 import CookieConsentBanner from '@/Components/CookieConsentBanner.vue';
+import LoginHistoryModal from '@/Components/LoginHistoryModal.vue';
 import {
   HomeIcon,
   UserIcon,
@@ -97,6 +98,7 @@ const page = usePage();
 const isCollapsed = ref(localStorage.getItem('sidebar_collapsed') === 'true');
 const isUpgradeModalOpen = ref(false);
 const isSearchOpen = ref(false);
+const isLoginHistoryOpen = ref(false);
 
 const toggleCollapse = () => {
   isCollapsed.value = !isCollapsed.value;
@@ -231,15 +233,15 @@ const resolveIcon = (iconName) => {
         :class="[isCollapsed ? 'opacity-0 group-hover/sidebar:opacity-100 hidden group-hover/sidebar:block' : 'opacity-100']"
       >
         <div class="flex items-center justify-between">
-          <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Subdomain</span>
-          <span class="font-mono font-bold text-red-600 text-[11px] truncate max-w-[120px]">{{ currentTenant.subdomain }}.jrvcrm.com</span>
+          <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Subdomain</span>
+          <span class="font-mono font-semibold text-red-600 text-xs truncate max-w-[120px]">{{ currentTenant.subdomain }}.jrvcrm.com</span>
         </div>
-        <div class="flex items-center justify-between text-[10px] text-slate-500 pt-0.5 border-t border-slate-100">
+        <div class="flex items-center justify-between text-xs text-slate-500 pt-0.5 border-t border-slate-100">
           <span class="flex items-center gap-1">
             <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
             <span>DB: {{ currentTenant.database_name ? 'Dedicated' : 'Isolated' }}</span>
           </span>
-          <span class="font-bold text-emerald-700">Active</span>
+          <span class="font-semibold text-emerald-700">Active</span>
         </div>
       </div>
 
@@ -256,7 +258,7 @@ const resolveIcon = (iconName) => {
           </span>
         </div>
         <kbd 
-          class="px-1.5 py-0.5 bg-white text-slate-400 group-hover:text-red-600 text-[10px] font-mono font-semibold rounded border border-slate-200"
+          class="px-1.5 py-0.5 bg-white text-slate-400 group-hover:text-red-600 text-xs font-mono font-medium rounded border border-slate-200"
           :class="[isCollapsed ? 'opacity-0 group-hover/sidebar:opacity-100 hidden group-hover/sidebar:inline' : 'opacity-100']"
         >
           ⌘K
@@ -365,7 +367,7 @@ const resolveIcon = (iconName) => {
           ></div>
         </div>
 
-        <div class="text-[11px] text-slate-500 font-normal leading-tight flex items-center justify-between">
+        <div class="text-xs text-slate-500 font-normal leading-tight flex items-center justify-between">
           <span>Free quota active</span>
           <span class="font-semibold text-red-600 hover:underline">Upgrade →</span>
         </div>
@@ -405,31 +407,50 @@ const resolveIcon = (iconName) => {
         </Link>
       </template>
 
-      <div :class="[isCollapsed ? 'hidden group-hover/sidebar:block' : 'block']">
+      <div :class="[isCollapsed ? 'hidden group-hover/sidebar:grid' : 'grid', 'grid-cols-2 gap-2']">
         <Link 
           href="/tenant/settings/navigation"
           title="Customize Menu"
-          class="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 text-slate-700 hover:bg-slate-100 hover:text-slate-900 rounded-lg text-xs font-semibold transition flex items-center justify-center gap-1.5"
+          class="px-2 py-1.5 bg-slate-50 border border-slate-200 text-slate-700 hover:bg-slate-100 hover:text-slate-900 rounded-lg text-xs font-semibold transition flex items-center justify-center gap-1"
         >
-          <AdjustmentsHorizontalIcon class="w-3.5 h-3.5 text-slate-500" />
-          <span>Customize Menu</span>
+          <AdjustmentsHorizontalIcon class="w-3.5 h-3.5 text-slate-500 shrink-0" />
+          <span class="truncate">Menu</span>
+        </Link>
+        <Link 
+          href="/settings/session-cookies"
+          title="Session & Cookie Control"
+          :class="[
+            'px-2 py-1.5 rounded-lg text-xs font-semibold transition flex items-center justify-center gap-1',
+            isCurrentRoute('/settings/session-cookies')
+              ? 'bg-indigo-600 text-white shadow-xs'
+              : 'bg-indigo-50 border border-indigo-200/80 text-indigo-700 hover:bg-indigo-100'
+          ]"
+        >
+          <ShieldCheckIcon class="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+          <span class="truncate">Sessions</span>
         </Link>
       </div>
 
-      <!-- User Profile Box with Logout -->
+      <!-- User Profile Box with Logout & Session Security Trigger -->
       <div class="flex items-center justify-between p-2 rounded-xl bg-slate-50 border border-slate-200">
-        <div class="flex items-center gap-2.5 min-w-0">
-          <div class="w-7 h-7 rounded-lg bg-red-600 text-white font-bold flex items-center justify-center text-xs shrink-0">
+        <button 
+          @click="isLoginHistoryOpen = true"
+          type="button"
+          title="View Active Device Sessions & Security"
+          class="flex items-center gap-2.5 min-w-0 text-left hover:opacity-80 transition cursor-pointer"
+        >
+          <div class="w-7 h-7 rounded-lg bg-red-600 text-white font-bold flex items-center justify-center text-xs shrink-0 relative">
             {{ authUser?.name ? authUser.name.charAt(0) : 'A' }}
+            <span class="w-2 h-2 rounded-full bg-emerald-500 absolute -bottom-0.5 -right-0.5 ring-1 ring-white" title="Active session"></span>
           </div>
           <div 
             class="min-w-0 transition-opacity duration-200"
             :class="[isCollapsed ? 'opacity-0 group-hover/sidebar:opacity-100 hidden group-hover/sidebar:block' : 'opacity-100']"
           >
             <div class="text-xs font-semibold text-slate-900 truncate">{{ authUser?.name || businessSettings.business_name }}</div>
-            <div class="text-[11px] text-slate-500 font-normal truncate">{{ authUser?.email || 'Admin Workspace' }}</div>
+            <div class="text-xs text-slate-500 font-normal truncate">{{ authUser?.email || 'Admin Workspace' }}</div>
           </div>
-        </div>
+        </button>
         <Link 
           href="/logout" 
           method="post" 
@@ -461,6 +482,12 @@ const resolveIcon = (iconName) => {
       :used-gb="tenantStorage.used_gb" 
       :limit-gb="tenantStorage.limit_gb" 
       @close="isUpgradeModalOpen = false" 
+    />
+
+    <!-- User Login History & Session Security Modal -->
+    <LoginHistoryModal 
+      :is-open="isLoginHistoryOpen" 
+      @close="isLoginHistoryOpen = false" 
     />
 
     <!-- Global GDPR Cookie Consent Banner -->

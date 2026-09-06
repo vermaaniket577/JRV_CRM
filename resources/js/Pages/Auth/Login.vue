@@ -31,7 +31,7 @@ const submit = () => {
       <div class="text-center space-y-2">
         <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-red-50 border border-red-100 text-xs font-semibold text-red-700">
           <SparklesIcon class="w-4 h-4 text-red-600" />
-          <span>Multi-Sector CRM Platform</span>
+          <span>Enterprise Cloud CRM</span>
         </div>
 
         <div class="flex flex-col items-center justify-center gap-1 pt-1">
@@ -55,7 +55,7 @@ const submit = () => {
                 v-model="form.email"
                 type="email"
                 required
-                placeholder="name@company.com"
+                placeholder="alex@company.com"
                 class="w-full bg-white border border-slate-300 rounded-xl pl-10 pr-4 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 placeholder:font-normal focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition shadow-2xs"
               />
             </div>
@@ -104,7 +104,7 @@ const submit = () => {
               :disabled="form.processing"
               class="w-full py-3 px-4 bg-red-600 hover:bg-red-700 text-white font-semibold text-sm rounded-xl shadow-md shadow-red-600/20 flex items-center justify-center gap-2 transition cursor-pointer disabled:opacity-50"
             >
-              <span>Sign in to CRM</span>
+              <span>Sign In</span>
               <ArrowRightIcon class="w-4 h-4 stroke-[2.5]" />
             </button>
           </div>
@@ -114,8 +114,20 @@ const submit = () => {
         <div class="pt-4 border-t border-slate-100 text-center text-sm text-slate-500 font-normal">
           <span>Don't have an account? </span>
           <Link href="/register" class="font-semibold text-red-600 hover:text-red-700 hover:underline">
-            Register your business
+            Create an account
           </Link>
+        </div>
+
+        <!-- Enterprise Security Guarantee -->
+        <div class="pt-1 flex items-center justify-center gap-3 text-xs text-slate-400 font-mono text-center">
+          <span class="flex items-center gap-1">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block"></span>
+            Isolated Database
+          </span>
+          <span>•</span>
+          <span>SSL Encrypted</span>
+          <span>•</span>
+          <span>Dedicated Subdomain</span>
         </div>
       </div>
     </div>

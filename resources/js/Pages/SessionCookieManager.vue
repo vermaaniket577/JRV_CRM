@@ -1,6 +1,6 @@
 <script setup>
 import { ref } from 'vue';
-import { useForm, Head } from '@inertiajs/vue3';
+import { useForm, Head, router } from '@inertiajs/vue3';
 import Navbar from '@/Components/Navbar.vue';
 import { 
   KeyIcon, 
@@ -70,6 +70,14 @@ const savePreferences = () => {
 const revokeOtherSessions = () => {
   if (confirm('Are you sure you want to revoke all other active browser sessions?')) {
     revokeSessionsForm.post('/settings/session-cookies/revoke-sessions', {
+      preserveScroll: true,
+    });
+  }
+};
+
+const terminateSession = (id) => {
+  if (confirm('Terminate this active device session? The user on that device will be signed out.')) {
+    router.delete(`/settings/session-cookies/session/${id}`, {
       preserveScroll: true,
     });
   }
@@ -216,6 +224,16 @@ const activeTab = ref('sessions');
                   <p class="text-xs text-slate-400 font-mono mt-0.5">IP: {{ s.ip_address }}</p>
                 </div>
               </div>
+
+              <button
+                v-if="!s.is_current"
+                @click="terminateSession(s.id)"
+                class="px-2.5 py-1 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 rounded-lg text-xs font-semibold transition flex items-center gap-1 cursor-pointer shrink-0"
+                title="Revoke this device session"
+              >
+                <TrashIcon class="w-3.5 h-3.5" />
+                <span>Terminate</span>
+              </button>
             </div>
 
             <div class="grid grid-cols-2 gap-2 text-xs pt-3 border-t border-slate-800/80 text-slate-400">

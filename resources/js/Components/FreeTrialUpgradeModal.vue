@@ -73,14 +73,31 @@ const plans = computed(() => {
         ? (rawAnnualPrice > 0 ? rawAnnualPrice : Math.round(rawMonthlyPrice * 0.8))
         : rawMonthlyPrice;
 
+      const defaultDescs = [
+        'Best starter CRM plan with everything you need to organize leads, contacts, and manage your pipeline at an affordable price.',
+        'Enterprise-class CRM platform crafted for high speed, automated team pipelines, superb security, and backed by 24×7 support.',
+        'Experience a new era of dedicated CRM infrastructure that delivers exceptional performance, custom workflows, and robust IT scale.'
+      ];
+
+      const defaultBadges = isAnnual ? ['74% off', '66% off', '66% off'] : ['20% off', '25% off', '20% off'];
+      const defaultOriginal = ['₹5,999', '₹19,999', '₹49,999'];
+
       return {
         id: p.id,
         name: p.name,
         tier: p.name.replace(/Plan/gi, '').trim(),
+        description: p.description || defaultDescs[index % defaultDescs.length],
+        discountBadge: defaultBadges[index % defaultBadges.length],
+        originalPrice: defaultOriginal[index % defaultOriginal.length],
         monthlyPrice: effectiveMonthlyPrice,
+        priceNumber: effectiveMonthlyPrice.toLocaleString('en-IN'),
+        priceSuffix: '.00/Mo',
         priceFormatted: '₹' + effectiveMonthlyPrice.toLocaleString('en-IN'),
         period: isAnnual ? '/mo' : '/month',
         annualSubtext: isAnnual ? `Billed as ₹${(effectiveMonthlyPrice * 12).toLocaleString('en-IN')}/yr` : null,
+        footnote: isAnnual 
+          ? 'with a 1-year discounted term and renewals at the current best rate.' 
+          : 'with monthly billing terms and renewals at the current best rate.',
         storage: (p.storage_limit_gb >= 999 ? 'Unlimited Storage' : `${p.storage_limit_gb} GB Storage`),
         users: (p.max_users >= 999 ? 'Unlimited Users' : `Up to ${p.max_users} Users`),
         features: parsedFeatures,
@@ -93,10 +110,16 @@ const plans = computed(() => {
     {
       name: 'Starter Plan',
       tier: 'Starter',
+      description: 'Best starter CRM plan with everything you need to organize leads, contacts, and manage your pipeline at an affordable price.',
+      discountBadge: isAnnual ? '74% off' : '20% off',
+      originalPrice: '₹5,999',
       monthlyPrice: isAnnual ? 3999 : 4999,
+      priceNumber: isAnnual ? '3,999' : '4,999',
+      priceSuffix: '.00/Mo',
       priceFormatted: isAnnual ? '₹3,999' : '₹4,999',
       period: isAnnual ? '/mo' : '/month',
       annualSubtext: isAnnual ? 'Billed as ₹47,988/yr' : null,
+      footnote: isAnnual ? 'with a 1-year discounted term and renewals at the current best rate.' : 'with monthly billing terms and renewals at the current best rate.',
       storage: '25 GB Storage',
       users: 'Up to 5 Users',
       features: [
@@ -111,10 +134,16 @@ const plans = computed(() => {
     {
       name: 'Growth Plan',
       tier: 'Growth',
+      description: 'Enterprise-class CRM platform crafted for high speed, automated team pipelines, superb security, and backed by 24×7 support.',
+      discountBadge: isAnnual ? '66% off' : '25% off',
+      originalPrice: '₹19,999',
       monthlyPrice: isAnnual ? 11999 : 14999,
+      priceNumber: isAnnual ? '11,999' : '14,999',
+      priceSuffix: '.00/Mo',
       priceFormatted: isAnnual ? '₹11,999' : '₹14,999',
       period: isAnnual ? '/mo' : '/month',
       annualSubtext: isAnnual ? 'Billed as ₹1,43,988/yr' : null,
+      footnote: isAnnual ? 'with a 1-year discounted term and renewals at the current best rate.' : 'with monthly billing terms and renewals at the current best rate.',
       storage: '100 GB Storage',
       users: 'Up to 20 Users',
       features: [
@@ -130,10 +159,16 @@ const plans = computed(() => {
     {
       name: 'Enterprise Plan',
       tier: 'Enterprise',
+      description: 'Experience a new era of dedicated CRM infrastructure that delivers exceptional performance, custom workflows, and robust IT scale.',
+      discountBadge: isAnnual ? '20% off' : '15% off',
+      originalPrice: '₹49,999',
       monthlyPrice: isAnnual ? 31999 : 39999,
+      priceNumber: isAnnual ? '31,999' : '39,999',
+      priceSuffix: '.00/Mo',
       priceFormatted: isAnnual ? '₹31,999' : '₹39,999',
       period: isAnnual ? '/mo' : '/month',
       annualSubtext: isAnnual ? 'Billed as ₹3,83,988/yr' : null,
+      footnote: isAnnual ? 'with a 1-year discounted term and renewals at the current best rate.' : 'with monthly billing terms and renewals at the current best rate.',
       storage: 'Unlimited Storage',
       users: 'Unlimited Users',
       features: [
@@ -325,7 +360,7 @@ const executePayment = async () => {
 
 const finishAndLaunch = () => {
   emit('close');
-  router.visit('/crm-selling-panel');
+  router.reload();
 };
 </script>
 
@@ -339,56 +374,56 @@ const finishAndLaunch = () => {
       ></div>
 
       <div class="flex min-h-full items-center justify-center p-3 text-center">
-        <div class="relative w-full max-w-3xl transform overflow-hidden rounded-3xl bg-white text-left align-middle shadow-2xl transition-all border border-slate-100 my-4">
+        <div class="relative w-full max-w-6xl transform overflow-hidden rounded-3xl bg-white text-left align-middle shadow-2xl transition-all border border-slate-100 my-4">
           
           <!-- STEP 1: SELECT PLAN GRID -->
           <template v-if="step === 'select'">
             <!-- Modal Header Banner -->
-            <div class="bg-gradient-to-r from-red-600 via-red-700 to-slate-900 p-4 sm:p-5 text-white relative">
+            <div class="bg-gradient-to-r from-red-600 via-red-700 to-slate-900 p-5 sm:p-6 text-white relative">
               <button 
                 @click="emit('close')"
-                class="absolute top-3.5 right-3.5 text-white/80 hover:text-white p-1.5 rounded-full hover:bg-white/10 transition-colors cursor-pointer"
+                class="absolute top-4 right-4 text-white/80 hover:text-white p-1.5 rounded-full hover:bg-white/10 transition-colors cursor-pointer"
               >
                 <XMarkIcon class="w-5 h-5" />
               </button>
 
-              <div class="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-white/20 text-white text-[10px] font-extrabold w-fit mb-2 backdrop-blur-xs">
-                <SparklesIcon class="w-3.5 h-3.5 text-amber-300" />
+              <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/20 text-white text-xs font-semibold w-fit mb-2.5 backdrop-blur-xs">
+                <SparklesIcon class="w-4 h-4 text-amber-300" />
                 <span>⚡ Free Trial Active (5 GB Space)</span>
               </div>
 
-              <h3 class="text-xl sm:text-2xl font-black tracking-tight text-white">
+              <h3 class="text-xl sm:text-2xl font-bold tracking-tight text-white">
                 Upgrade Your CRM Subscription Plan
               </h3>
-              <p class="text-xs text-red-100 mt-0.5 max-w-xl font-medium leading-relaxed">
+              <p class="text-sm text-red-100 mt-1 max-w-xl font-normal leading-relaxed">
                 5 GB Trial limit. Upgrade anytime to unlock higher cloud storage, team user seats, and sector automation.
               </p>
 
               <!-- Storage Usage Pill -->
-              <div class="mt-3 inline-flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-white/10 border border-white/20 text-[11px] font-bold backdrop-blur-xs">
-                <CloudIcon class="w-3.5 h-3.5 text-red-300 shrink-0" />
-                <span>Storage Used: <strong>{{ usedGb }} / {{ limitGb }} GB</strong></span>
-                <div class="w-20 bg-white/20 h-1.5 rounded-full overflow-hidden shrink-0">
+              <div class="mt-3.5 inline-flex items-center gap-2.5 px-3.5 py-1.5 rounded-xl bg-white/10 border border-white/20 text-xs font-medium backdrop-blur-xs">
+                <CloudIcon class="w-4 h-4 text-red-300 shrink-0" />
+                <span>Storage Used: <strong class="font-semibold text-white">{{ usedGb }} / {{ limitGb }} GB</strong></span>
+                <div class="w-24 bg-white/20 h-1.5 rounded-full overflow-hidden shrink-0 ml-1">
                   <div class="bg-amber-300 h-full rounded-full" :style="{ width: (usedGb / limitGb * 100) + '%' }"></div>
                 </div>
               </div>
             </div>
 
             <!-- Pricing Grid Body -->
-            <div class="p-4 sm:p-5 space-y-4">
+            <div class="p-6 sm:p-8 space-y-6">
               <div class="text-center space-y-2">
-                <h4 class="text-base font-extrabold text-slate-900">Choose the Right Plan for Your Firm</h4>
-                <p class="text-[11px] text-slate-500 font-medium">Simple, transparent pricing. Select monthly or annual billing to proceed to instant checkout.</p>
+                <h4 class="text-2xl font-bold text-slate-900 tracking-tight">Choose the Right Plan for Your Firm</h4>
+                <p class="text-sm text-slate-600 font-normal">Simple, transparent pricing. Select monthly or annual billing to proceed to instant checkout.</p>
 
                 <!-- Monthly / Annual Toggle Switch -->
-                <div class="flex items-center justify-center gap-3 pt-1">
-                  <div class="bg-slate-100 p-1 rounded-2xl border border-slate-200 inline-flex items-center gap-1 shadow-inner">
+                <div class="flex items-center justify-center gap-3 pt-2">
+                  <div class="bg-slate-100 p-1.5 rounded-2xl border border-slate-200 inline-flex items-center gap-1.5 shadow-inner">
                     <button 
                       type="button" 
                       @click="billingCycle = 'monthly'" 
                       :class="[
-                        'px-3.5 py-1.5 rounded-xl font-extrabold text-xs transition-all cursor-pointer',
-                        billingCycle === 'monthly' ? 'bg-white text-slate-900 shadow-2xs border border-slate-200' : 'text-slate-500 hover:text-slate-900'
+                        'px-4 py-2 rounded-xl font-semibold text-xs sm:text-sm transition-all cursor-pointer',
+                        billingCycle === 'monthly' ? 'bg-white text-slate-900 shadow-xs border border-slate-200' : 'text-slate-500 hover:text-slate-900'
                       ]"
                     >
                       Monthly Billing
@@ -397,12 +432,12 @@ const finishAndLaunch = () => {
                       type="button" 
                       @click="billingCycle = 'annually'" 
                       :class="[
-                        'px-3.5 py-1.5 rounded-xl font-extrabold text-xs transition-all cursor-pointer flex items-center gap-1.5',
-                        billingCycle === 'annually' ? 'bg-red-600 text-white shadow-xs' : 'text-slate-500 hover:text-slate-900'
+                        'px-4 py-2 rounded-xl font-semibold text-xs sm:text-sm transition-all cursor-pointer flex items-center gap-2',
+                        billingCycle === 'annually' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-500 hover:text-slate-900'
                       ]"
                     >
                       <span>Annual Billing</span>
-                      <span :class="['px-1.5 py-0.2 rounded-full text-[9px] font-black uppercase tracking-wider', billingCycle === 'annually' ? 'bg-white text-red-600' : 'bg-red-100 text-red-700']">
+                      <span :class="['px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider', billingCycle === 'annually' ? 'bg-white text-indigo-700' : 'bg-indigo-100 text-indigo-700']">
                         Save 20%
                       </span>
                     </button>
@@ -410,64 +445,79 @@ const finishAndLaunch = () => {
                 </div>
               </div>
 
-              <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <div 
                   v-for="plan in plans" 
                   :key="plan.tier"
                   :class="[
-                    'relative rounded-2xl p-4 border transition-all flex flex-col justify-between',
+                    'relative rounded-3xl p-6 sm:p-7 border transition-all flex flex-col justify-between bg-white shadow-xs hover:shadow-lg',
                     plan.popular 
-                      ? 'border-red-500 bg-red-50/20 shadow-md shadow-red-500/10 ring-2 ring-red-500' 
-                      : 'border-slate-200 bg-white hover:border-slate-300 shadow-2xs'
+                      ? 'border-indigo-500/80 ring-2 ring-indigo-500/20' 
+                      : 'border-slate-200 hover:border-slate-300'
                   ]"
                 >
-                  <div v-if="plan.popular" class="absolute -top-3 left-1/2 -translate-x-1/2 px-2.5 py-0.5 rounded-full bg-red-600 text-white text-[9px] font-black uppercase tracking-widest shadow-2xs">
-                    Most Popular
-                  </div>
-
-                  <div class="space-y-3">
-                    <div>
-                      <h5 class="text-sm font-extrabold text-slate-900">{{ plan.name }}</h5>
-                      <p class="text-[10px] text-slate-500 font-medium mt-0.5">{{ plan.storage }} • {{ plan.users }}</p>
+                  <div>
+                    <!-- Top row: Popular badge & Discount pill -->
+                    <div class="flex items-center justify-between gap-2 min-h-[28px] mb-3">
+                      <span v-if="plan.popular" class="px-3 py-1 rounded-full bg-red-600 text-white text-xs font-bold uppercase tracking-wider shadow-2xs">
+                        Most Popular
+                      </span>
+                      <span v-else></span>
+                      <span class="px-3 py-1 rounded-full text-xs font-bold bg-indigo-50 text-indigo-600 border border-indigo-100/70">
+                        {{ plan.discountBadge }}
+                      </span>
                     </div>
 
-                    <div>
-                      <div class="flex items-baseline gap-1">
-                        <span class="text-2xl font-black text-slate-900 tracking-tight">{{ plan.priceFormatted }}</span>
-                        <span class="text-[10px] font-bold text-slate-500">{{ plan.period }}</span>
-                      </div>
-                      <div v-if="plan.annualSubtext" class="text-[10px] text-red-600 font-extrabold mt-0.5">
-                        {{ plan.annualSubtext }}
-                      </div>
+                    <!-- Plan Title -->
+                    <h4 class="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
+                      {{ plan.name }}
+                    </h4>
+
+                    <!-- Description (matching reference image clean 3-line format) -->
+                    <p class="text-sm text-slate-600 font-normal leading-relaxed mt-2.5 min-h-[64px]">
+                      {{ plan.description }}
+                    </p>
+
+                    <!-- Strikethrough Original Price -->
+                    <div class="text-xs text-slate-400 font-medium line-through mt-4 mb-0.5">
+                      {{ plan.originalPrice }}
                     </div>
 
-                    <ul class="space-y-1.5 text-[11px] text-slate-600 font-medium pt-2 border-t border-slate-200">
-                      <li v-for="feat in plan.features" :key="feat" class="flex items-start gap-1.5 leading-snug">
-                        <CheckIcon class="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
-                        <span>{{ feat }}</span>
-                      </li>
-                    </ul>
-                  </div>
+                    <!-- Hero Price (Hostinger/SaaS reference layout) -->
+                    <div class="flex items-baseline gap-0.5 text-slate-900 tracking-tight">
+                      <span class="text-3xl sm:text-4xl font-extrabold text-slate-900">₹{{ plan.priceNumber }}</span>
+                      <span class="text-base font-bold text-slate-700">{{ plan.priceSuffix }}</span>
+                    </div>
 
-                  <div class="pt-4">
+                    <!-- CTA Button -->
                     <button 
                       @click="goToCheckout(plan)"
-                      :class="[
-                        'w-full py-2 rounded-xl text-xs font-extrabold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs',
-                        plan.popular 
-                          ? 'bg-red-600 hover:bg-red-700 text-white shadow-xs shadow-red-600/20' 
-                          : 'bg-slate-900 hover:bg-slate-800 text-white'
-                      ]"
+                      class="w-full py-3.5 px-6 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-sm sm:text-base transition-all shadow-md shadow-indigo-600/20 mt-5 cursor-pointer text-center flex items-center justify-center gap-2"
                     >
-                      <RocketLaunchIcon class="w-3.5 h-3.5" />
-                      <span>Select {{ plan.name }}</span>
+                      <span>See Plans</span>
                     </button>
+
+                    <!-- Footnote under button -->
+                    <p class="text-xs text-slate-500 font-normal text-center leading-relaxed mt-3">
+                      {{ plan.footnote }}
+                    </p>
+
+                    <!-- Included Features list -->
+                    <div class="mt-6 pt-5 border-t border-slate-100 space-y-2.5">
+                      <div class="text-xs font-semibold uppercase tracking-wider text-slate-400">Included Features</div>
+                      <ul class="space-y-2 text-xs sm:text-sm text-slate-600 font-normal">
+                        <li v-for="feat in plan.features" :key="feat" class="flex items-start gap-2 leading-relaxed">
+                          <CheckIcon class="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                          <span>{{ feat }}</span>
+                        </li>
+                      </ul>
+                    </div>
                   </div>
                 </div>
               </div>
 
               <!-- Footer Notes -->
-              <div class="flex flex-col sm:flex-row items-center justify-between gap-2 pt-3 border-t border-slate-200 text-[11px] text-slate-500 font-medium">
+              <div class="flex flex-col sm:flex-row items-center justify-between gap-2 pt-4 border-t border-slate-200 text-xs text-slate-500 font-medium">
                 <div class="flex items-center gap-1.5">
                   <ShieldCheckIcon class="w-3.5 h-3.5 text-emerald-600" />
                   <span>Instant Activation • Cancel Anytime • GST Invoicing Included</span>
@@ -487,10 +537,10 @@ const finishAndLaunch = () => {
                 </button>
                 <div>
                   <div class="flex items-center gap-2">
-                    <h3 class="text-lg font-black text-white">Secure Payment Checkout</h3>
-                    <span class="px-2 py-0.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[10px] font-black uppercase rounded-full">256-Bit SSL Encrypted</span>
+                    <h3 class="text-lg font-bold text-white">Secure Payment Checkout</h3>
+                    <span class="px-2.5 py-0.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-xs font-semibold uppercase rounded-full">256-Bit SSL Encrypted</span>
                   </div>
-                  <p class="text-xs text-slate-400 font-medium">Complete payment to activate {{ selectedPlanObj?.name }} automatically.</p>
+                  <p class="text-sm text-slate-400 font-normal">Complete payment to activate {{ selectedPlanObj?.name }} automatically.</p>
                 </div>
               </div>
 
@@ -505,34 +555,34 @@ const finishAndLaunch = () => {
                 
                 <!-- Left: Order Summary -->
                 <div class="bg-slate-50 p-5 rounded-2xl border border-slate-200 space-y-4">
-                  <h4 class="text-xs font-black uppercase text-slate-400 tracking-wider">Subscription Summary</h4>
+                  <h4 class="text-xs font-bold uppercase text-slate-400 tracking-wider">Subscription Summary</h4>
                   
                   <div class="flex items-center justify-between pb-3 border-b border-slate-200">
                     <div>
-                      <div class="font-black text-slate-900 text-sm">{{ selectedPlanObj?.name }}</div>
-                      <div class="text-xs text-slate-500 font-medium">{{ selectedPlanObj?.storage }} • {{ selectedPlanObj?.users }}</div>
+                      <div class="font-bold text-slate-900 text-sm">{{ selectedPlanObj?.name }}</div>
+                      <div class="text-xs text-slate-500 font-normal">{{ selectedPlanObj?.storage }} • {{ selectedPlanObj?.users }}</div>
                     </div>
-                    <span class="px-2.5 py-1 bg-red-50 text-red-700 border border-red-200 font-black rounded-lg text-xs">
+                    <span class="px-2.5 py-1 bg-red-50 text-red-700 border border-red-200 font-semibold rounded-lg text-xs">
                       {{ billingCycle === 'annually' ? 'Annual Plan' : 'Monthly Plan' }}
                     </span>
                   </div>
 
-                  <div class="space-y-2 text-xs font-medium text-slate-600">
+                  <div class="space-y-2 text-xs font-normal text-slate-600">
                     <div class="flex justify-between">
                       <span>Base Plan Price:</span>
-                      <span class="font-extrabold text-slate-900">₹{{ calculateTotal.base.toLocaleString('en-IN') }}</span>
+                      <span class="font-bold text-slate-900">₹{{ calculateTotal.base.toLocaleString('en-IN') }}</span>
                     </div>
                     <div class="flex justify-between">
                       <span>GST Tax (18%):</span>
-                      <span class="font-extrabold text-slate-900">₹{{ calculateTotal.gst.toLocaleString('en-IN') }}</span>
+                      <span class="font-bold text-slate-900">₹{{ calculateTotal.gst.toLocaleString('en-IN') }}</span>
                     </div>
                     <div class="flex justify-between pt-2 border-t border-slate-200 text-sm">
-                      <span class="font-black text-slate-900">Total Amount Payable:</span>
-                      <span class="font-black text-red-600 text-base">₹{{ calculateTotal.total.toLocaleString('en-IN') }}</span>
+                      <span class="font-bold text-slate-900">Total Amount Payable:</span>
+                      <span class="font-bold text-red-600 text-base">₹{{ calculateTotal.total.toLocaleString('en-IN') }}</span>
                     </div>
                   </div>
 
-                  <div class="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-[11px] font-bold text-emerald-800 flex items-center gap-2">
+                  <div class="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs font-medium text-emerald-800 flex items-center gap-2">
                     <ShieldCheckIcon class="w-4 h-4 text-emerald-600 shrink-0" />
                     <span>Instant automatic plan activation upon payment authorization.</span>
                   </div>
@@ -541,8 +591,8 @@ const finishAndLaunch = () => {
                 <!-- Right: Payment Method Tabs & Fields -->
                 <div class="space-y-4">
                   <div class="flex items-center justify-between">
-                    <h4 class="text-xs font-black uppercase text-slate-400 tracking-wider">Payment Gateway</h4>
-                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md bg-blue-50 border border-blue-200 text-blue-700 text-[10px] font-black font-mono">
+                    <h4 class="text-xs font-bold uppercase text-slate-400 tracking-wider">Payment Gateway</h4>
+                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md bg-blue-50 border border-blue-200 text-blue-700 text-xs font-semibold font-mono">
                       ⚡ Powered by Razorpay
                     </span>
                   </div>
@@ -552,7 +602,7 @@ const finishAndLaunch = () => {
                     <button 
                       @click="selectedPaymentMethod = 'upi'"
                       :class="[
-                        'p-2.5 rounded-xl border font-extrabold text-xs flex flex-col items-center gap-1 cursor-pointer transition-all',
+                        'p-2.5 rounded-xl border font-semibold text-xs flex flex-col items-center gap-1 cursor-pointer transition-all',
                         selectedPaymentMethod === 'upi' ? 'bg-red-600 text-white border-red-600 shadow-xs' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
                       ]"
                     >
@@ -563,7 +613,7 @@ const finishAndLaunch = () => {
                     <button 
                       @click="selectedPaymentMethod = 'card'"
                       :class="[
-                        'p-2.5 rounded-xl border font-extrabold text-xs flex flex-col items-center gap-1 cursor-pointer transition-all',
+                        'p-2.5 rounded-xl border font-semibold text-xs flex flex-col items-center gap-1 cursor-pointer transition-all',
                         selectedPaymentMethod === 'card' ? 'bg-red-600 text-white border-red-600 shadow-xs' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
                       ]"
                     >
@@ -574,7 +624,7 @@ const finishAndLaunch = () => {
                     <button 
                       @click="selectedPaymentMethod = 'netbanking'"
                       :class="[
-                        'p-2.5 rounded-xl border font-extrabold text-xs flex flex-col items-center gap-1 cursor-pointer transition-all',
+                        'p-2.5 rounded-xl border font-semibold text-xs flex flex-col items-center gap-1 cursor-pointer transition-all',
                         selectedPaymentMethod === 'netbanking' ? 'bg-red-600 text-white border-red-600 shadow-xs' : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
                       ]"
                     >
@@ -588,36 +638,36 @@ const finishAndLaunch = () => {
                     <div class="w-24 h-24 mx-auto bg-white p-2 rounded-xl border border-slate-300 shadow-2xs flex items-center justify-center">
                       <QrCodeIcon class="w-20 h-20 text-slate-800" />
                     </div>
-                    <div class="text-xs font-extrabold text-slate-900">Instant UPI & QR (GPay, PhonePe, Paytm) via Razorpay</div>
-                    <div class="text-[10px] text-slate-500 font-mono">100% Encrypted & PCI-DSS Compliant</div>
+                    <div class="text-xs font-semibold text-slate-900">Instant UPI & QR (GPay, PhonePe, Paytm) via Razorpay</div>
+                    <div class="text-xs text-slate-500 font-mono">100% Encrypted & PCI-DSS Compliant</div>
                   </div>
 
                   <!-- Card Form -->
                   <div v-if="selectedPaymentMethod === 'card'" class="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-2 text-xs">
                     <div>
-                      <label class="block text-[10px] font-extrabold text-slate-600 uppercase">Cardholder Name</label>
-                      <input type="text" value="Master Admin" class="w-full bg-white border border-slate-300 rounded-xl px-3 py-1.5 font-bold text-slate-900 focus:outline-none" />
+                      <label class="block text-xs font-semibold text-slate-600 uppercase">Cardholder Name</label>
+                      <input type="text" value="Master Admin" class="w-full bg-white border border-slate-300 rounded-xl px-3 py-1.5 font-medium text-slate-900 focus:outline-none" />
                     </div>
                     <div>
-                      <label class="block text-[10px] font-extrabold text-slate-600 uppercase">Card Number</label>
-                      <input type="text" value="4111 •••• •••• 8892" class="w-full bg-white border border-slate-300 rounded-xl px-3 py-1.5 font-bold text-slate-900 focus:outline-none" />
+                      <label class="block text-xs font-semibold text-slate-600 uppercase">Card Number</label>
+                      <input type="text" value="4111 •••• •••• 8892" class="w-full bg-white border border-slate-300 rounded-xl px-3 py-1.5 font-medium text-slate-900 focus:outline-none" />
                     </div>
                     <div class="grid grid-cols-2 gap-2">
                       <div>
-                        <label class="block text-[10px] font-extrabold text-slate-600 uppercase">Expiry (MM/YY)</label>
-                        <input type="text" value="12/28" class="w-full bg-white border border-slate-300 rounded-xl px-3 py-1.5 font-bold text-slate-900 focus:outline-none" />
+                        <label class="block text-xs font-semibold text-slate-600 uppercase">Expiry (MM/YY)</label>
+                        <input type="text" value="12/28" class="w-full bg-white border border-slate-300 rounded-xl px-3 py-1.5 font-medium text-slate-900 focus:outline-none" />
                       </div>
                       <div>
-                        <label class="block text-[10px] font-extrabold text-slate-600 uppercase">CVV</label>
-                        <input type="password" value="•••" class="w-full bg-white border border-slate-300 rounded-xl px-3 py-1.5 font-bold text-slate-900 focus:outline-none" />
+                        <label class="block text-xs font-semibold text-slate-600 uppercase">CVV</label>
+                        <input type="password" value="•••" class="w-full bg-white border border-slate-300 rounded-xl px-3 py-1.5 font-medium text-slate-900 focus:outline-none" />
                       </div>
                     </div>
                   </div>
 
                   <!-- NetBanking Form -->
                   <div v-if="selectedPaymentMethod === 'netbanking'" class="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-2 text-xs">
-                    <label class="block text-[10px] font-extrabold text-slate-600 uppercase">Select Bank</label>
-                    <select class="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 font-bold text-slate-900 focus:outline-none">
+                    <label class="block text-xs font-semibold text-slate-600 uppercase">Select Bank</label>
+                    <select class="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 font-medium text-slate-900 focus:outline-none">
                       <option>State Bank of India (SBI)</option>
                       <option>HDFC Bank</option>
                       <option>ICICI Bank</option>

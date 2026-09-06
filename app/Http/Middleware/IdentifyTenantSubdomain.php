@@ -61,6 +61,27 @@ class IdentifyTenantSubdomain
             }
         }
 
+        // Auto-login transfer token processing across subdomains
+        if ($authToken = $request->query('auth_token')) {
+            $userId = \Illuminate\Support\Facades\Cache::pull("subdomain_auth_{$authToken}");
+            if ($userId) {
+                $user = \App\Models\User::find($userId);
+                if ($user) {
+                    \Illuminate\Support\Facades\Auth::login($user);
+                    if ($user->tenant_id && !$tenant) {
+                        $tenant = Tenant::with(['industry', 'businessType'])->find($user->tenant_id);
+                        if ($tenant) {
+                            session(['tenant_id' => $tenant->id]);
+                            app()->instance('current_tenant', $tenant);
+                        }
+                    }
+                    
+                    $cleanUrl = $request->fullUrlWithoutQuery(['auth_token']);
+                    return redirect()->to($cleanUrl);
+                }
+            }
+        }
+
         return $next($request);
     }
 

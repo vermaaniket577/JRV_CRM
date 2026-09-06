@@ -1,0 +1,233 @@
+# ==============================================================================
+# JRV CRM - Multi-Node Horizontally Scaled Architecture
+# Components:
+#   - NGINX Load Balancer (Least-Connections & Reverse Proxy)
+#   - 3x Stateless Application Nodes (Horizontally Scaled)
+#   - 1x Dedicated Asynchronous Queue Worker (Redis-backed)
+#   - Redis (Shared Session Storage, Cache & Job Queue Broker)
+#   - MySQL Primary (Master - Read/Write)
+#   - MySQL Replica (Read Pool for heavy journal queries & reports)
+# ==============================================================================
+
+version: '3.8'
+
+services:
+  # ----------------------------------------------------------------------------
+  # 1. NGINX Reverse Proxy & Load Balancer
+  # ----------------------------------------------------------------------------
+  nginx-lb:
+    image: nginx:alpine
+    container_name: jrv-nginx-lb
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/load-balancer.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - app-node-1
+      - app-node-2
+      - app-node-3
+    networks:
+      - jrv-internal-network
+
+  # ----------------------------------------------------------------------------
+  # 2. Application Node 1
+  # ----------------------------------------------------------------------------
+  app-node-1:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: jrv-app-node-1
+    restart: unless-stopped
+    environment:
+      APP_ENV: production
+      APP_DEBUG: "false"
+      APP_URL: "http://localhost"
+      TRUSTED_PROXIES: "*"
+      SESSION_DRIVER: redis
+      SESSION_DOMAIN: ".localhost"
+      CACHE_STORE: redis
+      QUEUE_CONNECTION: redis
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      DB_CONNECTION: mysql
+      DB_HOST: mysql-primary
+      DB_PORT: 3306
+      DB_DATABASE: jrv_crm
+      DB_USERNAME: jrv_user
+      DB_PASSWORD: jrv_secure_password
+      DB_READ_HOST: "mysql-replica,mysql-primary"
+      DB_PERSISTENT: "true"
+    volumes:
+      - shared-storage:/var/www/html/storage/app/public
+    depends_on:
+      - redis
+      - mysql-primary
+    networks:
+      - jrv-internal-network
+
+  # ----------------------------------------------------------------------------
+  # 3. Application Node 2
+  # ----------------------------------------------------------------------------
+  app-node-2:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: jrv-app-node-2
+    restart: unless-stopped
+    environment:
+      APP_ENV: production
+      APP_DEBUG: "false"
+      APP_URL: "http://localhost"
+      TRUSTED_PROXIES: "*"
+      SESSION_DRIVER: redis
+      SESSION_DOMAIN: ".localhost"
+      CACHE_STORE: redis
+      QUEUE_CONNECTION: redis
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      DB_CONNECTION: mysql
+      DB_HOST: mysql-primary
+      DB_PORT: 3306
+      DB_DATABASE: jrv_crm
+      DB_USERNAME: jrv_user
+      DB_PASSWORD: jrv_secure_password
+      DB_READ_HOST: "mysql-replica,mysql-primary"
+      DB_PERSISTENT: "true"
+    volumes:
+      - shared-storage:/var/www/html/storage/app/public
+    depends_on:
+      - redis
+      - mysql-primary
+    networks:
+      - jrv-internal-network
+
+  # ----------------------------------------------------------------------------
+  # 4. Application Node 3
+  # ----------------------------------------------------------------------------
+  app-node-3:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: jrv-app-node-3
+    restart: unless-stopped
+    environment:
+      APP_ENV: production
+      APP_DEBUG: "false"
+      APP_URL: "http://localhost"
+      TRUSTED_PROXIES: "*"
+      SESSION_DRIVER: redis
+      SESSION_DOMAIN: ".localhost"
+      CACHE_STORE: redis
+      QUEUE_CONNECTION: redis
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      DB_CONNECTION: mysql
+      DB_HOST: mysql-primary
+      DB_PORT: 3306
+      DB_DATABASE: jrv_crm
+      DB_USERNAME: jrv_user
+      DB_PASSWORD: jrv_secure_password
+      DB_READ_HOST: "mysql-replica,mysql-primary"
+      DB_PERSISTENT: "true"
+    volumes:
+      - shared-storage:/var/www/html/storage/app/public
+    depends_on:
+      - redis
+      - mysql-primary
+    networks:
+      - jrv-internal-network
+
+  # ----------------------------------------------------------------------------
+  # 5. Dedicated Queue Worker (Offloads heavy PDF/email/AI jobs)
+  # ----------------------------------------------------------------------------
+  queue-worker:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: jrv-queue-worker
+    restart: unless-stopped
+    command: ["php", "artisan", "queue:work", "redis", "--tries=3", "--timeout=120", "--sleep=3"]
+    environment:
+      APP_ENV: production
+      QUEUE_CONNECTION: redis
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      DB_CONNECTION: mysql
+      DB_HOST: mysql-primary
+      DB_PORT: 3306
+      DB_DATABASE: jrv_crm
+      DB_USERNAME: jrv_user
+      DB_PASSWORD: jrv_secure_password
+    volumes:
+      - shared-storage:/var/www/html/storage/app/public
+    depends_on:
+      - redis
+      - mysql-primary
+    networks:
+      - jrv-internal-network
+
+  # ----------------------------------------------------------------------------
+  # 6. Centralized Redis (Session Store, Cache & Job Broker)
+  # ----------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: jrv-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory", "512mb", "--maxmemory-policy", "allkeys-lru"]
+    volumes:
+      - redis-data:/data
+    networks:
+      - jrv-internal-network
+
+  # ----------------------------------------------------------------------------
+  # 7. MySQL Primary Database (Read / Write Master)
+  # ----------------------------------------------------------------------------
+  mysql-primary:
+    image: mysql:8.0
+    container_name: jrv-mysql-primary
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root_master_password
+      MYSQL_DATABASE: jrv_crm
+      MYSQL_USER: jrv_user
+      MYSQL_PASSWORD: jrv_secure_password
+    volumes:
+      - mysql-primary-data:/var/lib/mysql
+    networks:
+      - jrv-internal-network
+
+  # ----------------------------------------------------------------------------
+  # 8. MySQL Read Replica (Read-Only Pool for Analytics & Journal Queries)
+  # ----------------------------------------------------------------------------
+  mysql-replica:
+    image: mysql:8.0
+    container_name: jrv-mysql-replica
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: root_replica_password
+      MYSQL_DATABASE: jrv_crm
+      MYSQL_USER: jrv_user
+      MYSQL_PASSWORD: jrv_secure_password
+    volumes:
+      - mysql-replica-data:/var/lib/mysql
+    networks:
+      - jrv-internal-network
+
+# ------------------------------------------------------------------------------
+# Persistent Shared Volumes & Network
+# ------------------------------------------------------------------------------
+volumes:
+  shared-storage:
+    driver: local
+  redis-data:
+    driver: local
+  mysql-primary-data:
+    driver: local
+  mysql-replica-data:
+    driver: local
+
+networks:
+  jrv-internal-network:
+    driver: bridge

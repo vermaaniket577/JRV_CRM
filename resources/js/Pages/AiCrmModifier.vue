@@ -2,6 +2,7 @@
 import { ref, computed } from 'vue';
 import { Head, useForm, router } from '@inertiajs/vue3';
 import Navbar from '@/Components/Navbar.vue';
+import FreeTrialUpgradeModal from '@/Components/FreeTrialUpgradeModal.vue';
 import {
   SparklesIcon,
   CpuChipIcon,
@@ -135,16 +136,6 @@ const handleApplyToWorkspace = () => {
   applyForm.config = activeConfig.value;
   applyForm.post('/ai-crm-modifier/apply', {
     preserveScroll: true,
-  });
-};
-
-// Quick 1-click Paid Plan activation for testing/demo
-const activatePaidPlan = (tier = 'growth') => {
-  router.post('/ai-crm-modifier/activate-paid', { tier }, {
-    preserveScroll: true,
-    onSuccess: () => {
-      showUpgradeModal.value = false;
-    }
   });
 };
 </script>
@@ -445,60 +436,11 @@ const activatePaidPlan = (tier = 'growth') => {
     </div>
   </div>
 
-  <!-- UPGRADE MODAL FOR FREE USERS -->
-  <div v-if="showUpgradeModal" class="fixed inset-0 z-50 overflow-y-auto">
-    <div @click="showUpgradeModal = false" class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs transition-opacity"></div>
-
-    <div class="flex min-h-full items-center justify-center p-4">
-      <div class="relative w-full max-w-xl bg-white rounded-3xl p-8 shadow-2xl border border-slate-200 space-y-6">
-        <!-- Header -->
-        <div class="text-center space-y-2">
-          <div class="w-14 h-14 bg-gradient-to-tr from-purple-600 to-indigo-600 rounded-3xl mx-auto flex items-center justify-center text-2xl text-white shadow-xl shadow-purple-900/20">
-            👑
-          </div>
-          <h3 class="text-xl font-black text-slate-900 tracking-tight">Unlock AI CRM Studio</h3>
-          <p class="text-xs text-slate-500 max-w-md mx-auto">
-            AI CRM Studio is exclusively available on Paid Plans (Starter, Growth Pro, Enterprise). Activate your plan to deploy infinite custom clinical schemas.
-          </p>
-        </div>
-
-        <!-- Plan Features Grid -->
-        <div class="grid grid-cols-2 gap-3">
-          <div class="p-4 rounded-2xl bg-purple-50/70 border border-purple-200 space-y-1 text-center">
-            <div class="text-xs font-black text-purple-900">Growth Pro Plan</div>
-            <div class="text-lg font-black text-purple-700">₹14,999<span class="text-[10px] font-normal">/mo</span></div>
-            <p class="text-[10px] text-purple-800">Unlimited AI Pipelines + 25 Users</p>
-            <button 
-              @click="activatePaidPlan('growth')"
-              class="w-full mt-2 py-1.5 bg-purple-600 hover:bg-purple-700 text-white font-black text-xs rounded-xl transition cursor-pointer"
-            >
-              Activate Growth
-            </button>
-          </div>
-
-          <div class="p-4 rounded-2xl bg-indigo-50/70 border border-indigo-200 space-y-1 text-center">
-            <div class="text-xs font-black text-indigo-900">Enterprise Suite</div>
-            <div class="text-lg font-black text-indigo-700">₹39,999<span class="text-[10px] font-normal">/mo</span></div>
-            <p class="text-[10px] text-indigo-800">Custom Multi-Hospital AI Engine</p>
-            <button 
-              @click="activatePaidPlan('enterprise')"
-              class="w-full mt-2 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-black text-xs rounded-xl transition cursor-pointer"
-            >
-              Activate Enterprise
-            </button>
-          </div>
-        </div>
-
-        <div class="flex justify-end gap-2 pt-2 border-t border-slate-100">
-          <button
-            type="button"
-            @click="showUpgradeModal = false"
-            class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition cursor-pointer"
-          >
-            Close Preview
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
+  <!-- UPGRADE MODAL FOR FREE USERS (DIRECT PAYMENT UPGRADE CHECKOUT) -->
+  <FreeTrialUpgradeModal 
+    :is-open="showUpgradeModal" 
+    :used-gb="1.25" 
+    :limit-gb="5.0" 
+    @close="showUpgradeModal = false" 
+  />
 </template>

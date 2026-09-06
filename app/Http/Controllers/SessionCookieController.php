@@ -20,10 +20,13 @@ class SessionCookieController extends Controller
         
         $sessions = [];
         if (Schema::hasTable('sessions')) {
-            $dbSessions = DB::table('sessions')
-                ->where('user_id', $user?->id)
-                ->orderBy('last_activity', 'desc')
-                ->get();
+            $query = DB::table('sessions');
+            if ($user) {
+                $query->where('user_id', $user->id);
+            } else {
+                $query->where('id', $currentSessionId);
+            }
+            $dbSessions = $query->orderBy('last_activity', 'desc')->get();
 
             foreach ($dbSessions as $s) {
                 $agent = $this->parseUserAgent($s->user_agent ?? '');
@@ -148,14 +151,90 @@ class SessionCookieController extends Controller
         $user = Auth::user();
         $currentSessionId = $request->session()->getId();
 
-        if (Schema::hasTable('sessions') && $user) {
-            DB::table('sessions')
-                ->where('user_id', $user->id)
-                ->where('id', '!=', $currentSessionId)
-                ->delete();
+        if (Schema::hasTable('sessions')) {
+            $query = DB::table('sessions')->where('id', '!=', $currentSessionId);
+            if ($user) {
+                $query->where('user_id', $user->id);
+            }
+            $query->delete();
         }
 
         return back()->with('success', 'All other active sessions have been successfully revoked.');
+    }
+
+    public function destroySession(Request $request, string $id): RedirectResponse
+    {
+        $user = Auth::user();
+        $currentSessionId = $request->session()->getId();
+
+        if ($id === $currentSessionId) {
+            return back()->with('error', 'Cannot terminate current active session. Use Logout instead.');
+        }
+
+        if (Schema::hasTable('sessions')) {
+            $query = DB::table('sessions')->where('id', $id);
+            if ($user) {
+                $query->where('user_id', $user->id);
+            }
+            $query->delete();
+        }
+
+        return back()->with('success', 'Selected session terminated successfully.');
+    }
+
+    public function getActiveSessionsApi(Request $request)
+    {
+        $user = Auth::user();
+        $currentSessionId = $request->session()->getId();
+
+        $sessions = [];
+        if (Schema::hasTable('sessions')) {
+            $query = DB::table('sessions');
+            if ($user) {
+                $query->where('user_id', $user->id);
+            } else {
+                $query->where('id', $currentSessionId);
+            }
+            $dbSessions = $query->orderBy('last_activity', 'desc')->get();
+
+            foreach ($dbSessions as $s) {
+                $agent = $this->parseUserAgent($s->user_agent ?? '');
+                $sessions[] = [
+                    'id' => $s->id,
+                    'id_preview' => substr($s->id, 0, 8) . '...',
+                    'ip_address' => $s->ip_address ?? '127.0.0.1',
+                    'user_agent' => $s->user_agent,
+                    'browser' => $agent['browser'],
+                    'platform' => $agent['platform'],
+                    'device_type' => $agent['device_type'],
+                    'last_activity' => date('Y-m-d H:i:s', $s->last_activity),
+                    'last_activity_human' => $this->timeElapsedString($s->last_activity),
+                    'is_current' => ($s->id === $currentSessionId),
+                ];
+            }
+        }
+
+        if (empty($sessions)) {
+            $agent = $this->parseUserAgent($request->header('User-Agent', ''));
+            $sessions[] = [
+                'id' => $currentSessionId,
+                'id_preview' => substr($currentSessionId, 0, 8) . '...',
+                'ip_address' => $request->ip(),
+                'user_agent' => $request->header('User-Agent'),
+                'browser' => $agent['browser'],
+                'platform' => $agent['platform'],
+                'device_type' => $agent['device_type'],
+                'last_activity' => date('Y-m-d H:i:s'),
+                'last_activity_human' => 'Just now',
+                'is_current' => true,
+            ];
+        }
+
+        return response()->json([
+            'sessions' => $sessions,
+            'current_session_id' => $currentSessionId,
+            'count' => count($sessions),
+        ]);
     }
 
     public function clearCookies(Request $request): RedirectResponse

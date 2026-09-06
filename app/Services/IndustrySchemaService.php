@@ -12,6 +12,33 @@ class IndustrySchemaService
         $slug = strtolower(trim((string) $slug));
 
         $configs = [
+            'research-publication' => [
+                'slug' => 'research-publication',
+                'name' => 'Research Journal & Paper Publication',
+                'icon' => '📑',
+                'color' => 'indigo',
+                'banner_title' => 'Research Journal & Manuscript Import Hub',
+                'banner_desc' => 'Import manuscripts, author submissions, peer reviewers, publication issues, and APC fee records from Excel spreadsheets and database dumps.',
+                'stats_labels' => [
+                    'candidates' => ['title' => 'Peer Reviewers', 'desc' => 'Active editors & reviewers'],
+                    'vacancies' => ['title' => 'Journal Issues', 'desc' => 'Upcoming volumes & editions'],
+                    'contacts' => ['title' => 'Authors & Researchers', 'desc' => 'Active submitting researchers'],
+                ],
+                'entities' => [
+                    [
+                        'id' => 'manuscripts',
+                        'name' => '📑 Research Manuscripts & Papers',
+                        'desc' => 'Paper title, author, target journal, domain, status, plagiarism %, DOI',
+                        'icon' => '📑',
+                        'table' => 'contacts',
+                        'columns' => ['paper_title', 'author_name', 'email', 'phone', 'target_journal', 'research_domain', 'similarity_percentage', 'status'],
+                        'sample_rows' => [
+                            ['Deep Learning Approaches for Autonomous Drone Navigation', 'Dr. Ramesh Kulkarni', 'ramesh.k@iitd.ac.in', '+91 98451 23456', 'Scopus Index Engineering Journal', 'Computer Science & AI', '8%', 'Accepted for Publication'],
+                            ['Novel Phytochemical Extraction from Zingiberaceae for Antimicrobial Efficacy', 'Dr. Sunita Deshmukh', 's.deshmukh@univ.edu', '+91 97654 32109', 'Medical & Pharma Research Journal', 'Medical & Health Sciences', '5%', 'Published & DOI Assigned'],
+                        ]
+                    ],
+                ]
+            ],
             'insurance' => [
                 'slug' => 'insurance',
                 'name' => 'Insurance',

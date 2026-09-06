@@ -124,17 +124,10 @@ class AiCrmModifierController extends Controller
     }
 
     /**
-     * Activate Paid Plan / Instant Demo Pro Unlock for testing
+     * Deprecated manual bypass - redirects to payment flow
      */
     public function activatePaid(Request $request): RedirectResponse
     {
-        $user = $request->user();
-        $tenantId = session('tenant_id') ?? $user?->tenant_id;
-
-        $plan = $request->input('tier', 'growth');
-        TenantSetting::setByKey('is_paid_plan', 'true', $tenantId);
-        TenantSetting::setByKey('subscription_tier', $plan, $tenantId);
-
-        return redirect()->back()->with('success', "🎉 Workspace upgraded to {$plan} Paid Plan! AI CRM Studio is now fully unlocked.");
+        return redirect()->back()->with('error', 'Please upgrade through the secure Razorpay payment gateway to activate your paid subscription.');
     }
 }

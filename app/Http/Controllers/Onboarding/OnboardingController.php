@@ -14,6 +14,8 @@ use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
+use Symfony\Component\HttpFoundation\Response as SymfonyResponse;
+
 class OnboardingController extends Controller
 {
     protected TenantDatabaseService $databaseService;
@@ -23,10 +25,30 @@ class OnboardingController extends Controller
         $this->databaseService = $databaseService;
     }
 
-    public function index(): Response
+    public function index(): Response|SymfonyResponse
     {
         $user = auth()->user();
         $tenant = $user ? Tenant::find($user->tenant_id) : null;
+
+        if ($tenant) {
+            session(['tenant_id' => $tenant->id]);
+
+            if ($tenant->onboarding_completed && !request()->has('reconfigure')) {
+                $authToken = \Illuminate\Support\Str::random(40);
+                \Illuminate\Support\Facades\Cache::put("subdomain_auth_{$authToken}", $user->id, now()->addMinutes(5));
+
+                $subdomainTargetUrl = $tenant->getSubdomainUrl('/', [
+                    'auth_token' => $authToken,
+                    'onboarding_success' => 1,
+                ]);
+
+                if (request()->header('X-Inertia')) {
+                    return Inertia::location($subdomainTargetUrl);
+                }
+
+                return redirect()->away($subdomainTargetUrl);
+            }
+        }
 
         $industries = Industry::active()
             ->orderBy('display_order')
@@ -41,6 +63,8 @@ class OnboardingController extends Controller
                 'id' => $tenant->id,
                 'name' => $tenant->name,
                 'slug' => $tenant->slug,
+                'subdomain' => $tenant->subdomain,
+                'subdomain_url' => $tenant->subdomain_url ?? ('https://' . $tenant->subdomain . '.jrvcrm.com'),
             ] : null,
         ]);
     }
@@ -71,7 +95,7 @@ class OnboardingController extends Controller
         return response()->json($columns);
     }
 
-    public function complete(Request $request): RedirectResponse
+    public function complete(Request $request): SymfonyResponse
     {
         $validated = $request->validate([
             'industry_id' => ['required', 'integer', 'exists:industries,id'],
@@ -97,6 +121,8 @@ class OnboardingController extends Controller
             'onboarding_completed' => true,
         ]);
 
+        session(['tenant_id' => $tenant->id]);
+
         // 1. Provision dynamic MySQL database and custom columns table
         $columns = $validated['selected_columns'] ?? [];
         $this->databaseService->createTenantDatabase($tenant, $columns);
@@ -105,6 +131,19 @@ class OnboardingController extends Controller
         $configService = new IndustryConfigurationService();
         $configService->provision($tenant);
 
-        return redirect('/tenant/crm-records')->with('success', "Your CRM database has been created with custom columns! Welcome to {$tenant->name}.");
+        // Generate secure transfer token for subdomain authentication
+        $authToken = \Illuminate\Support\Str::random(40);
+        \Illuminate\Support\Facades\Cache::put("subdomain_auth_{$authToken}", $user->id, now()->addMinutes(5));
+
+        $subdomainTargetUrl = $tenant->getSubdomainUrl('/', [
+            'auth_token' => $authToken,
+            'onboarding_success' => 1,
+        ]);
+
+        if ($request->header('X-Inertia')) {
+            return Inertia::location($subdomainTargetUrl);
+        }
+
+        return redirect()->away($subdomainTargetUrl);
     }
 }

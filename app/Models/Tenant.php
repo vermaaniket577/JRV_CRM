@@ -55,13 +55,42 @@ class Tenant extends Model
     public function getSubdomainUrlAttribute(): string
     {
         $sub = $this->subdomain ?: preg_replace('/[^a-zA-Z0-9]/', '', strtolower($this->slug ?: 'crm'));
-        $appUrl = config('app.url', 'http://localhost');
+        
+        $request = request();
+        if ($request) {
+            $host = $request->getHost();
+            $port = $request->getPort();
+            $scheme = $request->getScheme();
+            $portStr = ($port && !in_array((int)$port, [80, 443])) ? ":{$port}" : '';
+
+            if (str_ends_with($host, '.localhost') || $host === 'localhost' || $host === '127.0.0.1') {
+                return "{$scheme}://{$sub}.localhost{$portStr}";
+            }
+        }
+
+        $appUrl = config('app.url', 'http://localhost:8000');
         $host = parse_url($appUrl, PHP_URL_HOST) ?: 'localhost';
         $port = parse_url($appUrl, PHP_URL_PORT);
         $scheme = parse_url($appUrl, PHP_URL_SCHEME) ?: 'http';
         
-        $portStr = $port ? ":{$port}" : '';
+        if ($host === 'localhost' || $host === '127.0.0.1' || str_ends_with($host, '.localhost')) {
+            $portStr = ($port && !in_array((int)$port, [80, 443])) ? ":{$port}" : '';
+            return "{$scheme}://{$sub}.localhost{$portStr}";
+        }
+
+        $portStr = ($port && !in_array((int)$port, [80, 443])) ? ":{$port}" : '';
         return "{$scheme}://{$sub}.{$host}{$portStr}";
+    }
+
+    public function getSubdomainUrl(string $path = '/', array $params = []): string
+    {
+        $baseUrl = rtrim($this->subdomain_url, '/');
+        $path = '/' . ltrim($path, '/');
+        $url = $baseUrl . $path;
+        if (!empty($params)) {
+            $url .= '?' . http_build_query($params);
+        }
+        return $url;
     }
 
     public function industry(): BelongsTo

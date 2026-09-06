@@ -25,7 +25,8 @@ import {
   ArrowUpTrayIcon,
   EyeIcon,
   DocumentDuplicateIcon,
-  PrinterIcon
+  PrinterIcon,
+  AdjustmentsHorizontalIcon
 } from '@heroicons/vue/24/outline';
 
 const props = defineProps({
@@ -493,6 +494,17 @@ const printStandeeQr = () => {
         >
           <KeyIcon class="w-4 h-4" />
           Security & Password
+        </button>
+
+        <button 
+          @click="activeTab = 'sessions_cookies'"
+          :class="[
+            'px-4 py-2.5 rounded-xl font-bold text-xs transition flex items-center gap-2 whitespace-nowrap cursor-pointer',
+            activeTab === 'sessions_cookies' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+          ]"
+        >
+          <ShieldCheckIcon class="w-4 h-4" />
+          Sessions & Cookies
         </button>
       </div>
 
@@ -1878,6 +1890,67 @@ const printStandeeQr = () => {
             </button>
           </div>
         </form>
+      </div>
+
+      <!-- TAB 6: Sessions & Privacy Cookies -->
+      <div v-if="activeTab === 'sessions_cookies'" class="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-xs space-y-6 max-w-4xl">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+          <div>
+            <h2 class="text-lg font-black text-slate-900 flex items-center gap-2">
+              <ShieldCheckIcon class="w-5 h-5 text-indigo-600" />
+              <span>Active Sessions & Cookie Privacy</span>
+            </h2>
+            <p class="text-xs text-slate-500 font-medium">Manage connected device sessions, security tokens, and GDPR cookie consent.</p>
+          </div>
+
+          <Link 
+            href="/settings/session-cookies"
+            class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-md shadow-indigo-600/20 flex items-center gap-1.5 transition self-start sm:self-auto"
+          >
+            <ArrowTopRightOnSquareIcon class="w-3.5 h-3.5" />
+            <span>Open Full Session & Cookie Manager</span>
+          </Link>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div class="p-4 rounded-2xl bg-indigo-50/60 border border-indigo-100 space-y-1">
+            <span class="text-[10px] font-bold text-indigo-500 uppercase">Current Session ID</span>
+            <p class="font-mono text-xs font-bold text-slate-900 truncate">{{ $page.props.session_info?.id || 'Active' }}</p>
+            <p class="text-[10px] text-slate-400">Driver: {{ $page.props.session_info?.driver || 'database' }}</p>
+          </div>
+
+          <div class="p-4 rounded-2xl bg-emerald-50/60 border border-emerald-100 space-y-1">
+            <span class="text-[10px] font-bold text-emerald-600 uppercase">Active Devices / Sessions</span>
+            <p class="text-lg font-black text-slate-900">{{ $page.props.session_info?.active_sessions_count || 1 }} Connected</p>
+            <p class="text-[10px] text-slate-400">IP: {{ $page.props.session_info?.ip || '127.0.0.1' }}</p>
+          </div>
+
+          <div class="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-1">
+            <span class="text-[10px] font-bold text-slate-500 uppercase">Cookie Consent Status</span>
+            <p class="text-xs font-bold" :class="$page.props.cookie_settings?.consent_given ? 'text-emerald-600' : 'text-amber-600'">
+              {{ $page.props.cookie_settings?.consent_given ? '✓ Consent Granted' : 'Pending Review' }}
+            </p>
+            <p class="text-[10px] text-slate-400">{{ $page.props.cookie_settings?.total_cookies || 0 }} cookies tracked</p>
+          </div>
+        </div>
+
+        <div class="pt-2 flex flex-wrap items-center gap-3">
+          <Link 
+            href="/settings/session-cookies"
+            class="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-xs transition flex items-center gap-2"
+          >
+            <AdjustmentsHorizontalIcon class="w-4 h-4" />
+            <span>Customize Cookie Preferences</span>
+          </Link>
+          <button 
+            @click="$inertia.post('/settings/session-cookies/revoke-sessions')"
+            type="button"
+            class="px-4 py-2.5 bg-red-50 hover:bg-red-100 text-red-600 font-bold text-xs rounded-xl border border-red-200 transition flex items-center gap-2 cursor-pointer"
+          >
+            <TrashIcon class="w-4 h-4" />
+            <span>Terminate Other Active Sessions</span>
+          </button>
+        </div>
       </div>
 
     </main>

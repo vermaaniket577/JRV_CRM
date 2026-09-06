@@ -48,6 +48,7 @@ class CRMDatabaseSeeder extends Seeder
             ['key' => 'universal', 'label' => 'Universal Data', 'route' => '/online-users', 'icon' => 'GlobeAltIcon', 'display_order' => 7],
             ['key' => 'data_import', 'label' => 'Data Import Hub', 'route' => '/data-import', 'icon' => 'TableCellsIcon', 'display_order' => 8],
             ['key' => 'ai_crm', 'label' => 'AI CRM Studio', 'route' => '/ai-crm-modifier', 'icon' => 'SparklesIcon', 'display_order' => 9],
+            ['key' => 'session_cookies', 'label' => 'Session & Cookies', 'route' => '/settings/session-cookies', 'icon' => 'ShieldCheckIcon', 'display_order' => 10],
         ];
 
         foreach ($navItems as $item) {

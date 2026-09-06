@@ -116,6 +116,9 @@ class RazorpayController extends Controller
                 'status' => 'active',
                 'trial_ends_at' => $expiryDate,
             ]);
+
+            \App\Models\TenantSetting::setByKey('is_paid_plan', 'true', $tenant->id);
+            \App\Models\TenantSetting::setByKey('subscription_tier', $tier ?: 'growth', $tenant->id);
         }
 
         // Find or create plan record

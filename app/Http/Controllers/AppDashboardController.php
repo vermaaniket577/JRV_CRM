@@ -22,6 +22,10 @@ class AppDashboardController extends Controller
         $totalInstalled = 4876;
         $totalDownloads = 678;
 
+        $tenantId = session('tenant_id') ?? auth()->user()?->tenant_id;
+        $tenant = $tenantId ? \App\Models\Tenant::with('industry')->find($tenantId) : null;
+        $industrySlug = $tenant?->industry?->slug ?? 'education';
+
         $invoices = [
             ['id' => 'INV-1704200000121', 'category' => 'Premium Bio-data', 'price' => '₹5,100.00', 'status' => 'Paid', 'badge_class' => 'bg-emerald-100 text-emerald-800 border-emerald-300'],
             ['id' => 'INV-1704200000122', 'category' => 'Counselor Matching', 'price' => '₹2,100.00', 'status' => 'Out of Date', 'badge_class' => 'bg-rose-100 text-rose-800 border-rose-300'],
@@ -51,6 +55,22 @@ class AppDashboardController extends Controller
             ['name' => 'Lucia Beauty', 'role' => 'Matchmaker', 'likes' => '8.1k'],
             ['name' => 'Larsen Vesta', 'role' => 'Community Admin', 'likes' => '7.4k'],
         ];
+
+        if (in_array($industrySlug, ['research-publication', 'journal-publication', 'publication'])) {
+            $invoices = [
+                ['id' => 'APC-2026-0041', 'category' => 'Scopus APC Publication Fee', 'price' => '₹12,500.00', 'status' => 'Paid', 'badge_class' => 'bg-emerald-100 text-emerald-800 border-emerald-300'],
+                ['id' => 'APC-2026-0042', 'category' => 'Fast-Track Peer Review Fee', 'price' => '₹4,500.00', 'status' => 'In Progress', 'badge_class' => 'bg-amber-100 text-amber-800 border-amber-300'],
+                ['id' => 'APC-2026-0043', 'category' => 'UGC CARE Open Access Fee', 'price' => '₹7,200.00', 'status' => 'Paid', 'badge_class' => 'bg-emerald-100 text-emerald-800 border-emerald-300'],
+                ['id' => 'APC-2026-0044', 'category' => 'Hard Copy & Author Certificate', 'price' => '₹2,500.00', 'status' => 'Paid', 'badge_class' => 'bg-emerald-100 text-emerald-800 border-emerald-300'],
+                ['id' => 'APC-2026-0045', 'category' => 'Plagiarism Scan & Formatting', 'price' => '₹1,500.00', 'status' => 'Out of Date', 'badge_class' => 'bg-rose-100 text-rose-800 border-rose-300'],
+            ];
+
+            $topAuthors = [
+                ['name' => 'Dr. Ramesh Kulkarni', 'role' => 'Corresponding Author (IIT Delhi)', 'likes' => '14 Papers'],
+                ['name' => 'Prof. Sunita Deshmukh', 'role' => 'Senior Researcher (AIIMS)', 'likes' => '9 Papers'],
+                ['name' => 'Dr. Alan Turing Jr.', 'role' => 'Chief Reviewer (IEEE Fellow)', 'likes' => '28 Reviews'],
+            ];
+        }
 
         return Inertia::render('AppDashboard', [
             'userName' => $userName,

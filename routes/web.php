@@ -150,6 +150,8 @@ Route::get('/pay/plan/{token}', [EmbedPaymentController::class, 'showPlan'])->na
 Route::post('/pay/plan/{token}', [EmbedPaymentController::class, 'submitPlanPayment'])->name('public.pay.plan.submit');
 
 // Public REST API Endpoints (CORS Enabled for Website Integration)
+Route::get('/api/health', [\App\Http\Controllers\Api\HealthCheckController::class, 'check'])->name('api.health');
+
 Route::prefix('api/v1')->group(function () {
     Route::get('/members/search', [PublicMemberApiController::class, 'search']);
     Route::post('/members/register', [PublicMemberApiController::class, 'register']);
@@ -344,9 +346,11 @@ Route::prefix('tenant/settings')->name('tenant.settings.')->group(function () {
 // Session & Cookie Management Routes
 Route::prefix('settings/session-cookies')->name('session-cookies.')->group(function () {
     Route::get('/', [SessionCookieController::class, 'index'])->name('index');
+    Route::get('/active-sessions', [SessionCookieController::class, 'getActiveSessionsApi'])->name('api-sessions');
     Route::post('/consent', [SessionCookieController::class, 'updateConsent'])->name('consent');
     Route::post('/preferences', [SessionCookieController::class, 'updatePreferences'])->name('preferences');
     Route::post('/revoke-sessions', [SessionCookieController::class, 'revokeOtherSessions'])->name('revoke-sessions');
+    Route::delete('/session/{id}', [SessionCookieController::class, 'destroySession'])->name('destroy');
     Route::post('/clear-cookies', [SessionCookieController::class, 'clearCookies'])->name('clear-cookies');
 });
 
