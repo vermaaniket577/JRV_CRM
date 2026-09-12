@@ -94,7 +94,8 @@ class HandleInertiaRequests extends Middleware
                 ->unique('label')
                 ->sortBy('display_order');
 
-            $isMasterAdmin = (bool) ($user && $user->is_super_admin);
+            $isTenantSubdomain = app()->bound('is_tenant_subdomain') && app('is_tenant_subdomain');
+            $isMasterAdmin = (bool) ($user && $user->is_super_admin && !$isTenantSubdomain);
 
             // If user is not Master Admin, filter out all master admin items
             if (!$isMasterAdmin) {

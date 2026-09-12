@@ -20,7 +20,9 @@ import {
   ShieldCheckIcon,
   AdjustmentsHorizontalIcon,
   BuildingOfficeIcon,
-  ServerIcon
+  ServerIcon,
+  ArrowUpTrayIcon,
+  DocumentArrowUpIcon
 } from '@heroicons/vue/24/outline';
 
 const props = defineProps({
@@ -34,6 +36,117 @@ const selectedIndustry = ref(null);
 const businessTypes = ref([]);
 const loadingTypes = ref(false);
 const searchQuery = ref('');
+
+// Database Upload & Auto-Config State
+const selectedDbFile = ref(null);
+const isUploadingDb = ref(false);
+const uploadDbStep = ref(1);
+const uploadError = ref('');
+const uploadSuccessMessage = ref('');
+const isDraggingFile = ref(false);
+const fileInputRef = ref(null);
+
+const deployStepsList = [
+  'Reading and parsing SQL database file schema...',
+  'Deploying tables directly to dedicated MySQL database...',
+  'Registering dynamic custom fields and schema attributes...',
+  'Auto-detecting industry sector & calibrating CRM pipelines...',
+  'Loading data records and launching your CRM workspace...'
+];
+
+const handleDbFileSelect = (e) => {
+  const files = e.target.files;
+  if (files && files.length > 0) {
+    selectedDbFile.value = files[0];
+    uploadError.value = '';
+  }
+};
+
+const handleDbFileDrop = (e) => {
+  isDraggingFile.value = false;
+  const files = e.dataTransfer.files;
+  if (files && files.length > 0) {
+    selectedDbFile.value = files[0];
+    uploadError.value = '';
+  }
+};
+
+const removeSelectedDbFile = () => {
+  selectedDbFile.value = null;
+  uploadError.value = '';
+  if (fileInputRef.value) {
+    fileInputRef.value.value = '';
+  }
+};
+
+const formatFileSize = (bytes) => {
+  if (!bytes) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+};
+
+const deployUploadedDatabase = async () => {
+  if (!selectedDbFile.value) {
+    uploadError.value = 'Please select a .sql or spreadsheet file first.';
+    return;
+  }
+
+  isUploadingDb.value = true;
+  uploadDbStep.value = 1;
+  uploadError.value = '';
+
+  const stepInterval = setInterval(() => {
+    if (uploadDbStep.value < 4) {
+      uploadDbStep.value++;
+    }
+  }, 900);
+
+  const formData = new FormData();
+  formData.append('file', selectedDbFile.value);
+  if (selectedIndustry.value?.id) {
+    formData.append('industry_id', selectedIndustry.value.id);
+  }
+
+  try {
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+    const res = await fetch('/onboarding/upload-database', {
+      method: 'POST',
+      headers: {
+        'Accept': 'application/json',
+        ...(csrfToken ? { 'X-CSRF-TOKEN': csrfToken } : {})
+      },
+      body: formData
+    });
+
+    clearInterval(stepInterval);
+    const data = await res.json();
+
+    if (!res.ok || !data.success) {
+      throw new Error(data.error || data.message || 'Database deployment failed.');
+    }
+
+    uploadDbStep.value = 5;
+    uploadSuccessMessage.value = data.message || 'Database successfully deployed!';
+
+    setTimeout(() => {
+      if (data.redirect_url) {
+        window.location.href = data.redirect_url;
+      } else {
+        window.location.href = '/tenant/crm-records?onboarding_success=1';
+      }
+    }, 1000);
+  } catch (err) {
+    clearInterval(stepInterval);
+    isUploadingDb.value = false;
+    uploadError.value = err.message || 'Failed to deploy database. Please check your file and try again.';
+  }
+};
+
+const skipDatabaseStep = () => {
+  currentStep.value = 3;
+};
 
 // Database & Column state
 const availableColumns = ref(props.defaultColumns || []);
@@ -97,10 +210,11 @@ const selectedColumnsCount = computed(() => {
 
 const steps = [
   { number: 1, title: 'Industry', short: 'Industry' },
-  { number: 2, title: 'Specialization', short: 'Niche' },
-  { number: 3, title: 'Fields', short: 'Fields' },
-  { number: 4, title: 'Team Size', short: 'Team' },
-  { number: 5, title: 'Goals & Launch', short: 'Launch' },
+  { number: 2, title: 'Database Setup', short: 'Database' },
+  { number: 3, title: 'Specialization', short: 'Niche' },
+  { number: 4, title: 'Fields', short: 'Fields' },
+  { number: 5, title: 'Team Size', short: 'Team' },
+  { number: 6, title: 'Goals & Launch', short: 'Launch' },
 ];
 
 const progressPercent = computed(() => {
@@ -334,7 +448,7 @@ const completeOnboarding = () => {
               <span class="hidden md:inline">{{ step.title }}</span>
               <span class="inline md:hidden">{{ step.short }}</span>
             </button>
-            <span v-if="step.number < 5" class="text-slate-300 text-xs hidden sm:inline">›</span>
+            <span v-if="step.number < steps.length" class="text-slate-300 text-xs hidden sm:inline">›</span>
           </div>
         </div>
 
@@ -359,7 +473,7 @@ const completeOnboarding = () => {
         <div class="text-center space-y-2 max-w-2xl mx-auto">
           <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-50 border border-red-200 text-xs font-semibold text-red-700">
             <SparklesIcon class="w-4 h-4 text-red-600" />
-            <span>Step 1 of 5 • Industry Selection</span>
+            <span>Step 1 of 6 • Industry Selection</span>
           </div>
           <h1 class="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
             Choose Your CRM Industry
@@ -368,8 +482,8 @@ const completeOnboarding = () => {
             Select the industry that best matches your organization. We will automatically configure your default pipelines, client records, and workflows.
           </p>
 
-          <!-- Search Filter Bar -->
-          <div class="pt-3 max-w-md mx-auto">
+          <!-- Search Filter Bar & Quick Direct Upload -->
+          <div class="pt-3 max-w-md mx-auto space-y-2.5">
             <div class="relative">
               <MagnifyingGlassIcon class="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input 
@@ -381,6 +495,18 @@ const completeOnboarding = () => {
               <span class="absolute right-2.5 top-1/2 -translate-y-1/2 px-2 py-0.5 bg-slate-100 text-xs font-mono font-medium text-slate-600 rounded-md border border-slate-200">
                 {{ filteredIndustries.length }} industries
               </span>
+            </div>
+
+            <!-- Quick Direct Upload Action -->
+            <div class="flex items-center justify-center">
+              <button 
+                type="button" 
+                @click="currentStep = 2" 
+                class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-red-50 hover:bg-red-100 border border-red-200 text-xs text-red-700 hover:text-red-800 transition font-semibold cursor-pointer shadow-2xs group"
+              >
+                <CircleStackIcon class="w-3.5 h-3.5 text-red-600 group-hover:scale-110 transition" />
+                <span>Already have a database (.sql / .csv)? <span class="underline decoration-red-400">Upload Database Directly →</span></span>
+              </button>
             </div>
           </div>
         </div>
@@ -440,8 +566,225 @@ const completeOnboarding = () => {
 
       </div>
 
-      <!-- STEP 2: Select Specific Business Sub-Type / Niche -->
+      <!-- STEP 2: Database Setup (Upload Database or Skip) -->
       <div v-if="currentStep === 2" class="space-y-6 max-w-4xl mx-auto w-full">
+        <!-- Step 2 Heading -->
+        <div class="text-center space-y-2 max-w-2xl mx-auto">
+          <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-50 border border-red-200 text-xs font-semibold text-red-700">
+            <CircleStackIcon class="w-4 h-4 text-red-600" />
+            <span>Step 2 of 6 • Database Setup</span>
+          </div>
+          <h2 class="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
+            Upload Database or Skip to Configure
+          </h2>
+          <p class="text-slate-600 text-xs sm:text-sm font-normal max-w-xl mx-auto leading-relaxed">
+            Have an existing SQL database backup or spreadsheet? Upload it now to automatically build your CRM tables, custom fields, and records — or skip to configure manually.
+          </p>
+        </div>
+
+        <!-- Two Path Choice Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-12 gap-5 items-stretch">
+          
+          <!-- Path 1: Upload Existing Database (7 cols on md) -->
+          <div class="md:col-span-7 bg-white border border-red-200/80 rounded-2xl p-5 sm:p-6 shadow-sm flex flex-col justify-between relative overflow-hidden ring-1 ring-red-500/10">
+            <!-- Subtle accent top line -->
+            <div class="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-red-500 via-rose-500 to-red-600"></div>
+
+            <div class="space-y-4">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2.5">
+                  <div class="w-9 h-9 rounded-xl bg-red-50 border border-red-200 flex items-center justify-center text-red-600">
+                    <DocumentArrowUpIcon class="w-5 h-5 stroke-[2]" />
+                  </div>
+                  <div>
+                    <h3 class="font-bold text-sm text-slate-900">Upload Database Backup</h3>
+                    <p class="text-xs text-slate-500">Supports .sql, .dump, .csv, .xlsx, .json</p>
+                  </div>
+                </div>
+                <span class="px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 text-xs font-semibold border border-emerald-200">
+                  ⚡ Auto-Configure CRM
+                </span>
+              </div>
+
+              <!-- Drag & Drop Zone -->
+              <div
+                @dragover.prevent="isDraggingFile = true"
+                @dragleave.prevent="isDraggingFile = false"
+                @drop.prevent="handleDbFileDrop"
+                @click="fileInputRef?.click()"
+                :class="[
+                  'border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-all duration-200',
+                  isDraggingFile 
+                    ? 'border-red-500 bg-red-50/60 scale-[1.01]' 
+                    : selectedDbFile 
+                      ? 'border-emerald-400 bg-emerald-50/30' 
+                      : 'border-slate-300 hover:border-red-400 hover:bg-slate-50/60'
+                ]"
+              >
+                <input
+                  ref="fileInputRef"
+                  type="file"
+                  accept=".sql,.dump,.csv,.xlsx,.xls,.json,.tsv"
+                  class="hidden"
+                  @change="handleDbFileSelect"
+                />
+
+                <!-- If File Selected -->
+                <div v-if="selectedDbFile" class="space-y-2">
+                  <div class="w-12 h-12 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center mx-auto text-xl">
+                    📁
+                  </div>
+                  <div class="min-w-0">
+                    <p class="text-sm font-bold text-slate-900 truncate">{{ selectedDbFile.name }}</p>
+                    <p class="text-xs font-mono text-slate-500">{{ formatFileSize(selectedDbFile.size) }}</p>
+                  </div>
+                  <div class="pt-1 flex items-center justify-center gap-2">
+                    <button
+                      type="button"
+                      @click.stop="removeSelectedDbFile"
+                      class="text-xs text-red-600 hover:text-red-700 font-medium px-2.5 py-1 rounded-lg bg-red-50 hover:bg-red-100 transition"
+                    >
+                      Remove / Change File
+                    </button>
+                  </div>
+                </div>
+
+                <!-- If No File Selected -->
+                <div v-else class="space-y-2 py-2">
+                  <div class="w-12 h-12 rounded-xl bg-red-50 text-red-600 flex items-center justify-center mx-auto">
+                    <ArrowUpTrayIcon class="w-6 h-6 stroke-[2]" />
+                  </div>
+                  <div>
+                    <p class="text-sm font-semibold text-slate-800">
+                      <span class="text-red-600 font-bold hover:underline">Click to browse</span> or drag and drop
+                    </p>
+                    <p class="text-xs text-slate-500 mt-0.5">
+                      Upload an exported MySQL dump (.sql) or customer spreadsheet
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Feature Bullets / Highlights -->
+              <div class="grid grid-cols-2 gap-2 text-xs text-slate-600 bg-slate-50/80 p-3 rounded-xl border border-slate-200/80">
+                <div class="flex items-center gap-1.5">
+                  <CheckCircleIcon class="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span>Dedicated Database</span>
+                </div>
+                <div class="flex items-center gap-1.5">
+                  <CheckCircleIcon class="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span>Auto-detects Industry</span>
+                </div>
+                <div class="flex items-center gap-1.5">
+                  <CheckCircleIcon class="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span>Registers Custom Fields</span>
+                </div>
+                <div class="flex items-center gap-1.5">
+                  <CheckCircleIcon class="w-4 h-4 text-emerald-600 shrink-0" />
+                  <span>Displays Data Instantly</span>
+                </div>
+              </div>
+
+              <!-- Error Alert -->
+              <div v-if="uploadError" class="p-3 rounded-xl bg-red-50 border border-red-200 text-xs text-red-700 flex items-start gap-2">
+                <span class="text-base leading-none">⚠️</span>
+                <span class="font-medium">{{ uploadError }}</span>
+              </div>
+            </div>
+
+            <!-- Deploy Button -->
+            <div class="pt-4 mt-2 border-t border-slate-100 flex items-center justify-between gap-3">
+              <span class="text-xs text-slate-500 truncate">
+                {{ selectedDbFile ? 'File ready to deploy' : 'Select a .sql or spreadsheet file' }}
+              </span>
+              <button
+                type="button"
+                @click="deployUploadedDatabase"
+                :disabled="!selectedDbFile || isUploadingDb"
+                :class="[
+                  'px-5 py-2.5 rounded-xl text-xs font-bold transition flex items-center gap-2 shadow-sm shrink-0',
+                  selectedDbFile && !isUploadingDb
+                    ? 'bg-red-600 hover:bg-red-700 text-white shadow-red-600/20 cursor-pointer'
+                    : 'bg-slate-200 text-slate-400 cursor-not-allowed'
+                ]"
+              >
+                <RocketLaunchIcon class="w-4 h-4 stroke-[2]" />
+                <span>Deploy Database & Launch CRM</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Path 2: Skip & Configure Manually (5 cols on md) -->
+          <div class="md:col-span-5 bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 shadow-xs flex flex-col justify-between hover:border-slate-300 transition">
+            <div class="space-y-3.5">
+              <div class="flex items-center gap-2.5">
+                <div class="w-9 h-9 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-700 text-lg">
+                  ⚡
+                </div>
+                <div>
+                  <h3 class="font-bold text-sm text-slate-900">Start Clean / Manual</h3>
+                  <p class="text-xs text-slate-500">No database backup? Skip ahead</p>
+                </div>
+              </div>
+
+              <p class="text-xs text-slate-600 leading-relaxed">
+                You don't need a database to get started. We will guide you through choosing your business model, customer fields, team size, and goals. You can always import or upload databases later.
+              </p>
+
+              <div class="space-y-2 pt-1">
+                <div class="flex items-center gap-2 text-xs text-slate-500">
+                  <span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+                  <span>Step-by-step niche customization</span>
+                </div>
+                <div class="flex items-center gap-2 text-xs text-slate-500">
+                  <span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+                  <span>Pick and edit default CRM fields</span>
+                </div>
+                <div class="flex items-center gap-2 text-xs text-slate-500">
+                  <span class="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
+                  <span>Calibrate user roles & permissions</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="pt-4 mt-4 border-t border-slate-100">
+              <button
+                type="button"
+                @click="skipDatabaseStep"
+                class="w-full py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold rounded-xl flex items-center justify-center gap-2 transition cursor-pointer"
+              >
+                <span>Skip & Setup Manually</span>
+                <ArrowRightIcon class="w-3.5 h-3.5 stroke-[2.5]" />
+              </button>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Navigation Action Buttons -->
+        <div class="flex items-center justify-between pt-6 border-t border-slate-200">
+          <button 
+            @click="currentStep = 1" 
+            type="button" 
+            class="px-5 py-2.5 bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 text-xs font-semibold rounded-xl flex items-center gap-2 transition cursor-pointer shadow-xs"
+          >
+            <ArrowLeftIcon class="w-3.5 h-3.5 stroke-[2.5]" />
+            <span>Back to Industry</span>
+          </button>
+          
+          <button 
+            @click="skipDatabaseStep" 
+            type="button" 
+            class="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl flex items-center gap-2 transition cursor-pointer"
+          >
+            <span>Skip this step</span>
+            <ArrowRightIcon class="w-3.5 h-3.5 stroke-[2.5]" />
+          </button>
+        </div>
+      </div>
+
+      <!-- STEP 3: Select Specific Business Sub-Type / Niche -->
+      <div v-if="currentStep === 3" class="space-y-6 max-w-4xl mx-auto w-full">
         <div class="text-center space-y-2 max-w-2xl mx-auto">
           <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-50 border border-red-200 text-xs font-semibold text-red-700">
             <span>{{ selectedIndustry?.icon }} {{ selectedIndustry?.name }}</span>
@@ -485,7 +828,7 @@ const completeOnboarding = () => {
         <!-- Navigation Action Buttons -->
         <div class="flex items-center justify-between pt-6 border-t border-slate-200">
           <button 
-            @click="currentStep = 1" 
+            @click="currentStep = 2" 
             type="button" 
             class="px-5 py-2.5 bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 text-sm font-medium rounded-xl flex items-center gap-2 transition cursor-pointer shadow-xs"
           >
@@ -493,7 +836,7 @@ const completeOnboarding = () => {
             <span>Back</span>
           </button>
           <button 
-            @click="currentStep = 3" 
+            @click="currentStep = 4" 
             type="button" 
             class="px-6 py-2.5 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold rounded-xl flex items-center gap-2 shadow-md shadow-red-600/20 transition cursor-pointer"
           >
@@ -503,14 +846,14 @@ const completeOnboarding = () => {
         </div>
       </div>
 
-      <!-- STEP 3: Client Schema & Columns Inspector -->
-      <div v-if="currentStep === 3" class="space-y-6 max-w-5xl mx-auto w-full">
+      <!-- STEP 4: Client Schema & Columns Inspector -->
+      <div v-if="currentStep === 4" class="space-y-6 max-w-5xl mx-auto w-full">
         
         <!-- Step Header -->
         <div class="text-center space-y-2 max-w-2xl mx-auto">
           <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-50 border border-red-200 text-xs font-semibold text-red-700">
             <CircleStackIcon class="w-4 h-4 text-red-600" />
-            <span>Step 3 of 5 • Customer Fields</span>
+            <span>Step 4 of 6 • Customer Fields</span>
           </div>
           <h2 class="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">Configure Customer Record Fields</h2>
           <p class="text-slate-600 text-xs sm:text-sm font-normal leading-relaxed">
@@ -699,7 +1042,7 @@ const completeOnboarding = () => {
         <!-- Navigation Action Buttons -->
         <div class="flex items-center justify-between pt-6 border-t border-slate-200">
           <button 
-            @click="currentStep = 2" 
+            @click="currentStep = 3" 
             type="button" 
             class="px-5 py-2.5 bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 text-xs font-semibold rounded-xl flex items-center gap-2 transition cursor-pointer shadow-xs"
           >
@@ -707,7 +1050,7 @@ const completeOnboarding = () => {
             <span>Back</span>
           </button>
           <button 
-            @click="currentStep = 4" 
+            @click="currentStep = 5" 
             type="button" 
             class="px-6 py-2.5 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-xl flex items-center gap-2 shadow-md shadow-red-600/20 transition cursor-pointer"
           >
@@ -717,12 +1060,12 @@ const completeOnboarding = () => {
         </div>
       </div>
 
-      <!-- STEP 4: Select Organization Capacity -->
-      <div v-if="currentStep === 4" class="space-y-6 max-w-4xl mx-auto w-full">
+      <!-- STEP 5: Select Organization Capacity -->
+      <div v-if="currentStep === 5" class="space-y-6 max-w-4xl mx-auto w-full">
         <div class="text-center space-y-2 max-w-2xl mx-auto">
           <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-50 border border-red-200 text-xs font-semibold text-red-700">
             <UserGroupIcon class="w-4 h-4 text-red-600" />
-            <span>Step 4 of 5 • Team Size</span>
+            <span>Step 5 of 6 • Team Size</span>
           </div>
           <h2 class="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">How Large Is Your Team?</h2>
           <p class="text-slate-600 text-xs sm:text-sm font-normal">Select your team size to help us calibrate initial user quotas, permissions, and workspace defaults.</p>
@@ -761,7 +1104,7 @@ const completeOnboarding = () => {
         <!-- Navigation Action Buttons -->
         <div class="flex items-center justify-between pt-6 border-t border-slate-200">
           <button 
-            @click="currentStep = 3" 
+            @click="currentStep = 4" 
             type="button" 
             class="px-5 py-2.5 bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 text-xs font-semibold rounded-xl flex items-center gap-2 transition cursor-pointer shadow-xs"
           >
@@ -769,7 +1112,7 @@ const completeOnboarding = () => {
             <span>Back</span>
           </button>
           <button 
-            @click="currentStep = 5" 
+            @click="currentStep = 6" 
             type="button" 
             class="px-6 py-2.5 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-xl flex items-center gap-2 shadow-md shadow-red-600/20 transition cursor-pointer"
           >
@@ -779,12 +1122,12 @@ const completeOnboarding = () => {
         </div>
       </div>
 
-      <!-- STEP 5: Select Primary Objectives & Provision Database -->
-      <div v-if="currentStep === 5" class="space-y-6 max-w-4xl mx-auto w-full">
+      <!-- STEP 6: Select Primary Objectives & Provision Database -->
+      <div v-if="currentStep === 6" class="space-y-6 max-w-4xl mx-auto w-full">
         <div class="text-center space-y-2 max-w-2xl mx-auto">
           <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-50 border border-red-200 text-xs font-semibold text-red-700">
             <SparklesIcon class="w-4 h-4 text-red-600" />
-            <span>Step 5 of 5 • Workspace Goals</span>
+            <span>Step 6 of 6 • Workspace Goals</span>
           </div>
           <h2 class="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">What Are Your Primary Objectives?</h2>
           <p class="text-slate-600 text-xs sm:text-sm font-normal">Select the modules and tools you plan to use most. We'll configure your dashboard and primary shortcuts accordingly.</p>
@@ -825,7 +1168,7 @@ const completeOnboarding = () => {
         <!-- Launch Button & Back -->
         <div class="flex items-center justify-between pt-6 border-t border-slate-200">
           <button 
-            @click="currentStep = 4" 
+            @click="currentStep = 5" 
             type="button" 
             class="px-5 py-2.5 bg-white hover:bg-slate-100 border border-slate-300 text-slate-700 text-sm font-medium rounded-xl flex items-center gap-2 transition cursor-pointer shadow-xs"
           >
@@ -893,6 +1236,45 @@ const completeOnboarding = () => {
         <div class="flex items-center justify-center gap-2 text-xs text-slate-500">
           <div class="w-3.5 h-3.5 border-2 border-red-500 border-t-transparent rounded-full animate-spin"></div>
           <span>This usually takes just a few seconds...</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Dedicated Database Deployment Progress Modal -->
+    <div v-if="isUploadingDb" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md">
+      <div class="bg-white border border-slate-200 text-slate-900 rounded-3xl max-w-md w-full p-8 shadow-2xl space-y-6 text-center">
+        <div class="w-16 h-16 rounded-2xl bg-red-50 border border-red-200 text-red-600 flex items-center justify-center mx-auto text-2xl font-bold">
+          <CircleStackIcon class="w-8 h-8 animate-pulse text-red-600" />
+        </div>
+
+        <div class="space-y-1.5">
+          <h3 class="text-xl font-bold text-slate-900 tracking-tight">Deploying Database Into Your CRM</h3>
+          <p class="text-xs text-slate-500">
+            Reading schema from <span class="font-mono text-slate-700 font-semibold">{{ selectedDbFile?.name }}</span> and configuring workspace...
+          </p>
+        </div>
+
+        <!-- 5 Step Live Deployment Checklist -->
+        <div class="space-y-3 text-left text-xs bg-slate-50 p-4 rounded-2xl border border-slate-200">
+          <div
+            v-for="(stepText, sIdx) in deployStepsList"
+            :key="sIdx"
+            class="flex items-center gap-2.5"
+            :class="uploadDbStep > sIdx ? 'text-emerald-700 font-medium' : 'text-slate-400'"
+          >
+            <CheckCircleIcon v-if="uploadDbStep > sIdx" class="w-4 h-4 text-emerald-600 shrink-0" />
+            <div v-else-if="uploadDbStep === sIdx + 1" class="w-4 h-4 border-2 border-red-500 border-t-transparent rounded-full animate-spin shrink-0"></div>
+            <div v-else class="w-4 h-4 rounded-full border border-slate-300 shrink-0"></div>
+            <span>{{ stepText }}</span>
+          </div>
+        </div>
+
+        <div v-if="uploadSuccessMessage" class="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs font-semibold text-emerald-700">
+          {{ uploadSuccessMessage }}
+        </div>
+        <div v-else class="flex items-center justify-center gap-2 text-xs text-slate-500">
+          <div class="w-3.5 h-3.5 border-2 border-red-500 border-t-transparent rounded-full animate-spin"></div>
+          <span>Configuring CRM and displaying your database...</span>
         </div>
       </div>
     </div>

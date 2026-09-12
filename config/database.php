@@ -77,6 +77,26 @@ return [
             ]) : [],
         ],
 
+        // Dynamic CRM tenant database connection (configured at runtime by DynamicDatabaseManager)
+        'dynamic_crm' => [
+            'driver' => 'mysql',
+            'host' => env('DB_HOST', '127.0.0.1'),
+            'port' => env('DB_PORT', '3306'),
+            'database' => env('DYNAMIC_CRM_DATABASE', 'dynamic_crm_placeholder'),
+            'username' => env('DB_USERNAME', 'root'),
+            'password' => env('DB_PASSWORD', ''),
+            'unix_socket' => env('DB_SOCKET', ''),
+            'charset' => env('DB_CHARSET', 'utf8mb4'),
+            'collation' => env('DB_COLLATION', 'utf8mb4_unicode_ci'),
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'strict' => false,
+            'engine' => null,
+            'options' => extension_loaded('pdo_mysql') ? array_filter([
+                \PDO::ATTR_EMULATE_PREPARES => true,
+            ]) : [],
+        ],
+
         'mariadb' => [
             'driver' => 'mariadb',
             'url' => env('DB_URL'),

@@ -5,6 +5,7 @@ import GlobalSearchModal from '@/Components/GlobalSearchModal.vue';
 import FreeTrialUpgradeModal from '@/Components/FreeTrialUpgradeModal.vue';
 import CookieConsentBanner from '@/Components/CookieConsentBanner.vue';
 import LoginHistoryModal from '@/Components/LoginHistoryModal.vue';
+import IdleTimeoutModal from '@/Components/IdleTimeoutModal.vue';
 import {
   HomeIcon,
   UserIcon,
@@ -49,7 +50,8 @@ import {
   CurrencyRupeeIcon,
   CurrencyDollarIcon,
   BookOpenIcon,
-  ClipboardDocumentCheckIcon
+  ClipboardDocumentCheckIcon,
+  ServerStackIcon
 } from '@heroicons/vue/24/outline';
 
 const iconMap = {
@@ -297,8 +299,9 @@ const resolveIcon = (iconName) => {
           </Link>
         </template>
 
-        <!-- Dedicated Dynamic CRM Database & Custom Columns Hub -->
+        <!-- Dedicated Dynamic CRM Database & Custom Columns Hub (Master Admin Only) -->
         <Link 
+          v-if="isMasterAdmin && isMasterAdminPage"
           href="/tenant/crm-records"
           title="Dynamic Database & Columns"
           :class="[
@@ -314,6 +317,67 @@ const resolveIcon = (iconName) => {
             :class="[isCollapsed ? 'opacity-0 group-hover/sidebar:opacity-100 hidden group-hover/sidebar:inline' : 'opacity-100']"
           >
             Database Hub
+          </span>
+        </Link>
+
+        <!-- CRM Data / Uploaded Records (Clean standard navigation link for User CRM) -->
+        <Link 
+          v-if="!isMasterAdminPage"
+          href="/tenant/crm-records"
+          title="CRM Data & Uploaded Records"
+          :class="[
+            'px-3 py-2 rounded-xl text-sm font-medium transition-all flex items-center gap-3',
+            isCurrentRoute('/tenant/crm-records')
+              ? 'bg-red-50 text-red-600 font-semibold border border-red-100' 
+              : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+          ]"
+        >
+          <TableCellsIcon :class="['w-4 h-4 shrink-0', isCurrentRoute('/tenant/crm-records') ? 'text-red-600' : 'text-slate-400']" />
+          <span 
+            class="truncate transition-opacity duration-75"
+            :class="[isCollapsed ? 'opacity-0 group-hover/sidebar:opacity-100 hidden group-hover/sidebar:inline' : 'opacity-100']"
+          >
+            CRM Data
+          </span>
+        </Link>
+
+        <!-- Dynamic CRM Engine (Database-driven CRM) -->
+        <Link 
+          href="/dynamic-crm/dashboard"
+          title="Dynamic Database CRM Engine"
+          :class="[
+            'px-3 py-2 rounded-xl text-sm font-medium transition-all flex items-center gap-3',
+            page.url && page.url.startsWith('/dynamic-crm')
+              ? 'bg-violet-50 text-violet-600 font-semibold border border-violet-100' 
+              : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+          ]"
+        >
+          <SparklesIcon :class="['w-4 h-4 shrink-0', page.url && page.url.startsWith('/dynamic-crm') ? 'text-violet-600' : 'text-violet-500']" />
+          <span 
+            class="truncate transition-opacity duration-75"
+            :class="[isCollapsed ? 'opacity-0 group-hover/sidebar:opacity-100 hidden group-hover/sidebar:inline' : 'opacity-100']"
+          >
+            Dynamic CRM
+          </span>
+        </Link>
+
+        <!-- Universal Data Import & Database Upload Link -->
+        <Link 
+          href="/data-import"
+          title="Upload & Import Database"
+          :class="[
+            'px-3 py-2 rounded-xl text-sm font-medium transition-all flex items-center gap-3',
+            isCurrentRoute('/data-import')
+              ? 'bg-red-50 text-red-600 font-semibold border border-red-100' 
+              : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+          ]"
+        >
+          <ArrowDownTrayIcon :class="['w-4 h-4 shrink-0', isCurrentRoute('/data-import') ? 'text-red-600' : 'text-slate-400']" />
+          <span 
+            class="truncate transition-opacity duration-75"
+            :class="[isCollapsed ? 'opacity-0 group-hover/sidebar:opacity-100 hidden group-hover/sidebar:inline' : 'opacity-100']"
+          >
+            Upload Database
           </span>
         </Link>
 
@@ -405,6 +469,25 @@ const resolveIcon = (iconName) => {
             CRM Selling Panel
           </span>
         </Link>
+
+        <Link 
+          href="/admin/load-balancer"
+          title="Software Load Balancer & Cluster Controller"
+          :class="[
+            'w-full px-3 py-2 rounded-xl text-xs font-semibold shadow-xs transition flex items-center justify-center gap-2',
+            isCurrentRoute('/admin/load-balancer')
+              ? 'bg-purple-600 text-white ring-2 ring-purple-400'
+              : 'bg-purple-50 text-purple-700 border border-purple-200/80 hover:bg-purple-100'
+          ]"
+        >
+          <ServerStackIcon class="w-4 h-4 text-purple-600 shrink-0" />
+          <span 
+            class="truncate transition-opacity duration-75"
+            :class="[isCollapsed ? 'opacity-0 group-hover/sidebar:opacity-100 hidden group-hover/sidebar:inline' : 'opacity-100']"
+          >
+            Load Balancer
+          </span>
+        </Link>
       </template>
 
       <div :class="[isCollapsed ? 'hidden group-hover/sidebar:grid' : 'grid', 'grid-cols-2 gap-2']">
@@ -492,6 +575,9 @@ const resolveIcon = (iconName) => {
 
     <!-- Global GDPR Cookie Consent Banner -->
     <CookieConsentBanner />
+
+    <!-- Inactivity Idle Auto-Logout Warning Modal -->
+    <IdleTimeoutModal />
   </aside>
 
   <!-- Layout Spacer (preserves space in flex containers for the fixed sidebar) -->

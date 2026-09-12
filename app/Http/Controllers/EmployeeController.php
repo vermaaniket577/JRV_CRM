@@ -24,7 +24,17 @@ class EmployeeController extends Controller
         $city = $request->query('city');
         $activeOnly = $request->boolean('active', true);
 
+        $isSubdomain = app()->bound('is_tenant_subdomain') && app('is_tenant_subdomain');
+        $currentTenant = app()->bound('current_tenant') ? app('current_tenant') : null;
+        $tenantId = ($isSubdomain && $currentTenant) ? $currentTenant->id : (session('tenant_id') ?? $request->user()?->tenant_id);
+
         $query = User::with('employeeProfile')->where('is_super_admin', false);
+
+        if ($tenantId) {
+            $query->where('tenant_id', $tenantId);
+        } elseif ($isSubdomain) {
+            $query->whereRaw('1 = 0');
+        }
 
         if ($activeOnly) {
             $query->where('status', 'active');
@@ -56,19 +66,34 @@ class EmployeeController extends Controller
 
         if ($searchQuery) {
             if ($searchType === 'ID') {
-                $query->where('id', $searchQuery)
-                    ->orWhereHas('employeeProfile', fn ($q) => $q->where('employee_code', 'like', "%{$searchQuery}%"));
+                $query->where(function ($q) use ($searchQuery) {
+                    $q->where('id', $searchQuery)
+                      ->orWhereHas('employeeProfile', fn ($p) => $p->where('employee_code', 'like', "%{$searchQuery}%"));
+                });
             } else {
-                $query->where('name', 'like', "%{$searchQuery}%")
-                    ->orWhere('email', 'like', "%{$searchQuery}%");
+                $query->where(function ($q) use ($searchQuery) {
+                    $q->where('name', 'like', "%{$searchQuery}%")
+                      ->orWhere('email', 'like', "%{$searchQuery}%");
+                });
             }
         }
 
-        $totalEmployees = User::where('is_super_admin', false)->count();
-        $totalAttendance = EmployeeProfile::where('attendance_status', 'Present')->count();
-        $salaryRequests = EmployeeProfile::where('payment_status', 'Pending')->count();
-        $leaveRequests = EmployeeProfile::where('attendance_status', 'On Leave')->count();
-        $absentCount = EmployeeProfile::where('attendance_status', 'Absent')->count();
+        $userBase = User::where('is_super_admin', false);
+        $profileBase = EmployeeProfile::whereHas('user', fn ($u) => $u->where('is_super_admin', false));
+
+        if ($tenantId) {
+            $userBase->where('tenant_id', $tenantId);
+            $profileBase->whereHas('user', fn ($u) => $u->where('tenant_id', $tenantId));
+        } elseif ($isSubdomain) {
+            $userBase->whereRaw('1 = 0');
+            $profileBase->whereRaw('1 = 0');
+        }
+
+        $totalEmployees = (clone $userBase)->count();
+        $totalAttendance = (clone $profileBase)->where('attendance_status', 'Present')->count();
+        $salaryRequests = (clone $profileBase)->where('payment_status', 'Pending')->count();
+        $leaveRequests = (clone $profileBase)->where('attendance_status', 'On Leave')->count();
+        $absentCount = (clone $profileBase)->where('attendance_status', 'Absent')->count();
 
         $employees = $query->latest()->get();
 
@@ -97,6 +122,10 @@ class EmployeeController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
+        $isSubdomain = app()->bound('is_tenant_subdomain') && app('is_tenant_subdomain');
+        $currentTenant = app()->bound('current_tenant') ? app('current_tenant') : null;
+        $tenantId = ($isSubdomain && $currentTenant) ? $currentTenant->id : (session('tenant_id') ?? $request->user()?->tenant_id);
+
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email', 'unique:users,email'],
@@ -111,6 +140,7 @@ class EmployeeController extends Controller
         ]);
 
         $user = User::create([
+            'tenant_id' => $tenantId,
             'name' => $validated['name'],
             'email' => $validated['email'],
             'password' => Hash::make('password123'),
@@ -175,7 +205,18 @@ class EmployeeController extends Controller
 
     public function export(Request $request)
     {
-        $employees = User::with('employeeProfile')->where('is_super_admin', false)->latest()->get();
+        $isSubdomain = app()->bound('is_tenant_subdomain') && app('is_tenant_subdomain');
+        $currentTenant = app()->bound('current_tenant') ? app('current_tenant') : null;
+        $tenantId = ($isSubdomain && $currentTenant) ? $currentTenant->id : (session('tenant_id') ?? $request->user()?->tenant_id);
+
+        $query = User::with('employeeProfile')->where('is_super_admin', false);
+        if ($tenantId) {
+            $query->where('tenant_id', $tenantId);
+        } elseif ($isSubdomain) {
+            $query->whereRaw('1 = 0');
+        }
+
+        $employees = $query->latest()->get();
         $filename = 'employees_export_' . date('Y_m_d_His') . '.csv';
 
         $headers = [
@@ -233,6 +274,10 @@ class EmployeeController extends Controller
 
     public function import(Request $request): RedirectResponse
     {
+        $isSubdomain = app()->bound('is_tenant_subdomain') && app('is_tenant_subdomain');
+        $currentTenant = app()->bound('current_tenant') ? app('current_tenant') : null;
+        $tenantId = ($isSubdomain && $currentTenant) ? $currentTenant->id : (session('tenant_id') ?? $request->user()?->tenant_id);
+
         $request->validate([
             'file' => ['required', 'file', 'mimes:csv,txt'],
         ]);
@@ -259,6 +304,7 @@ class EmployeeController extends Controller
             $user = User::updateOrCreate(
                 ['email' => $email],
                 [
+                    'tenant_id' => $tenantId,
                     'name' => $name,
                     'password' => Hash::make('password123'),
                     'status' => 'active',

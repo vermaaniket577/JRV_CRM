@@ -40,6 +40,24 @@ use App\Http\Controllers\SystemSettingController;
 use App\Http\Middleware\EnsureMasterAdmin;
 use Illuminate\Support\Facades\Route;
 
+use App\Http\Controllers\Admin\LoadBalancerController;
+use App\Http\Controllers\Api\HealthCheckController;
+
+// Dynamic CRM Engine Controllers
+use App\Http\Controllers\DynamicCrm\DashboardController as DynamicCrmDashboardController;
+use App\Http\Controllers\DynamicCrm\DatabaseUploadController;
+use App\Http\Controllers\DynamicCrm\DynamicCrudController;
+use App\Http\Controllers\DynamicCrm\TableConfigurationController;
+use App\Http\Controllers\DynamicCrm\GlobalSearchController as DynamicCrmSearchController;
+use App\Http\Middleware\ValidateDynamicTable;
+
+// Cluster Health Probes & Software Load Balancer Gateway Routes
+Route::get('/up', [HealthCheckController::class, 'check'])->name('health.up');
+Route::get('/api/health', [HealthCheckController::class, 'check'])->name('health.check');
+Route::get('/lb/status', [LoadBalancerController::class, 'clusterStatus'])->name('lb.status');
+Route::any('/lb/gateway', [LoadBalancerController::class, 'proxyGateway'])->name('lb.gateway');
+Route::any('/lb/proxy/{any}', [LoadBalancerController::class, 'proxyGateway'])->where('any', '.*')->name('lb.proxy');
+
 // Master Admin Authentication Routes
 Route::get('/admin/login', [AdminLoginController::class, 'showLoginForm'])->name('admin.login');
 Route::post('/admin/login', [AdminLoginController::class, 'login']);
@@ -57,6 +75,19 @@ Route::prefix('admin')->middleware(EnsureMasterAdmin::class)->name('admin.')->gr
     Route::get('/settings', [AdminPanelController::class, 'settings'])->name('settings.index');
     Route::post('/settings', [AdminPanelController::class, 'updateSettings'])->name('settings.update');
     Route::post('/subscription/process-payment', [AdminPanelController::class, 'processPayment'])->name('subscription.process-payment');
+
+    // Load Balancer Cluster Management Control Center
+    Route::get('/load-balancer', [LoadBalancerController::class, 'index'])->name('load-balancer.index');
+    Route::post('/load-balancer/nodes', [LoadBalancerController::class, 'storeNode'])->name('load-balancer.nodes.store');
+    Route::put('/load-balancer/nodes/{node}', [LoadBalancerController::class, 'updateNode'])->name('load-balancer.nodes.update');
+    Route::delete('/load-balancer/nodes/{node}', [LoadBalancerController::class, 'destroyNode'])->name('load-balancer.nodes.destroy');
+    Route::post('/load-balancer/nodes/{node}/drain', [LoadBalancerController::class, 'toggleDrain'])->name('load-balancer.nodes.drain');
+    Route::post('/load-balancer/nodes/{node}/toggle', [LoadBalancerController::class, 'toggleEnabled'])->name('load-balancer.nodes.toggle');
+    Route::post('/load-balancer/nodes/{node}/ping', [LoadBalancerController::class, 'pingNode'])->name('load-balancer.nodes.ping');
+    Route::post('/load-balancer/ping-all', [LoadBalancerController::class, 'pingAll'])->name('load-balancer.ping-all');
+    Route::post('/load-balancer/algorithm', [LoadBalancerController::class, 'updateAlgorithm'])->name('load-balancer.algorithm');
+    Route::post('/load-balancer/simulate', [LoadBalancerController::class, 'simulate'])->name('load-balancer.simulate');
+    Route::get('/load-balancer/export', [LoadBalancerController::class, 'exportConfig'])->name('load-balancer.export');
 
     // Admin prefixed module routes
     Route::get('/broadcast-message', [BroadcastMessageController::class, 'index'])->name('broadcast.index');
@@ -89,12 +120,16 @@ Route::middleware('guest')->group(function () {
     Route::post('/register', [RegisterController::class, 'register']);
 });
 Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
+Route::post('/keep-alive', function () {
+    return response()->json(['status' => 'ok', 'timestamp' => now()->toIso8601String()]);
+})->name('keep-alive');
 
 // Onboarding Routes
 Route::middleware('auth')->prefix('onboarding')->name('onboarding.')->group(function () {
     Route::get('/', [OnboardingController::class, 'index'])->name('index');
     Route::get('/business-types', [OnboardingController::class, 'getBusinessTypes'])->name('business-types');
     Route::get('/industry-columns', [OnboardingController::class, 'getIndustryColumns'])->name('industry-columns');
+    Route::post('/upload-database', [OnboardingController::class, 'uploadDatabase'])->name('upload-database');
     Route::post('/complete', [OnboardingController::class, 'complete'])->name('complete');
 });
 
@@ -107,6 +142,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/tenant/crm-records/export', [TenantDatabaseManagerController::class, 'exportCsv'])->name('tenant.crm-records.export');
     Route::post('/tenant/database/columns', [TenantDatabaseManagerController::class, 'addColumn'])->name('tenant.database.columns.add');
     Route::delete('/tenant/database/columns/{column}', [TenantDatabaseManagerController::class, 'deleteColumn'])->name('tenant.database.columns.delete');
+    Route::post('/tenant/database/upload', [TenantDatabaseManagerController::class, 'uploadDatabase'])->name('tenant.database.upload');
 
     // Razorpay Payment Gateway Routes
     Route::post('/razorpay/create-order', [RazorpayController::class, 'createOrder'])->name('razorpay.create-order');
@@ -187,6 +223,7 @@ Route::prefix('staff-recruitment')->name('recruitment.')->group(function () {
 Route::prefix('data-import')->name('data-import.')->group(function () {
     Route::get('/', [DataImportController::class, 'index'])->name('index');
     Route::post('/excel', [DataImportController::class, 'importExcel'])->name('excel');
+    Route::post('/sql', [DataImportController::class, 'importSqlDump'])->name('sql');
     Route::post('/database-test', [DataImportController::class, 'testDatabase'])->name('database.test');
     Route::post('/database-sync', [DataImportController::class, 'importDatabase'])->name('database.sync');
     Route::get('/sample/{entity}', [DataImportController::class, 'downloadSample'])->name('sample');
@@ -361,6 +398,37 @@ Route::prefix('system-settings')->name('system-settings.')->group(function () {
     Route::post('/password', [SystemSettingController::class, 'updatePassword'])->name('password');
     Route::post('/payments', [SystemSettingController::class, 'updatePayments'])->name('payments');
     Route::post('/social', [SystemSettingController::class, 'updateSocial'])->name('social');
+});
+
+// ╔══════════════════════════════════════════════════════════════════╗
+// ║  Dynamic CRM Engine — Metadata-Driven Multi-Table CRUD Routes  ║
+// ╚══════════════════════════════════════════════════════════════════╝
+Route::middleware(['auth'])->prefix('dynamic-crm')->name('dynamic-crm.')->group(function () {
+    // Dashboard
+    Route::get('/dashboard', [DynamicCrmDashboardController::class, 'index'])->name('dashboard');
+
+    // Database Upload
+    Route::get('/database/upload', [DatabaseUploadController::class, 'show'])->name('database.upload');
+    Route::post('/database/upload', [DatabaseUploadController::class, 'upload'])->name('database.upload.store');
+    Route::get('/database/status', [DatabaseUploadController::class, 'status'])->name('database.status');
+
+    // Global Search
+    Route::get('/search', [DynamicCrmSearchController::class, 'search'])->name('search');
+
+    // Table Configuration (before CRUD catch-all)
+    Route::get('/configure/{table}', [TableConfigurationController::class, 'show'])->name('configure');
+    Route::put('/configure/{table}', [TableConfigurationController::class, 'update'])->name('configure.update');
+
+    // Dynamic CRUD — ValidateDynamicTable middleware ensures table name is whitelisted
+    Route::middleware([ValidateDynamicTable::class])->group(function () {
+        Route::get('/{table}', [DynamicCrudController::class, 'index'])->name('table.index');
+        Route::get('/{table}/create', [DynamicCrudController::class, 'create'])->name('table.create');
+        Route::post('/{table}', [DynamicCrudController::class, 'store'])->name('table.store');
+        Route::get('/{table}/{id}', [DynamicCrudController::class, 'show'])->name('table.show')->where('id', '[0-9]+');
+        Route::get('/{table}/{id}/edit', [DynamicCrudController::class, 'edit'])->name('table.edit')->where('id', '[0-9]+');
+        Route::put('/{table}/{id}', [DynamicCrudController::class, 'update'])->name('table.update')->where('id', '[0-9]+');
+        Route::delete('/{table}/{id}', [DynamicCrudController::class, 'destroy'])->name('table.destroy')->where('id', '[0-9]+');
+    });
 });
 
 // Graceful fallback for any undefined or custom module routes (prevents 404 popups)

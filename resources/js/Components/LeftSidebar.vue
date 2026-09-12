@@ -16,6 +16,7 @@ import {
   FunnelIcon,
   CreditCardIcon,
   ClipboardDocumentListIcon,
+  SparklesIcon,
   LinkIcon
 } from '@heroicons/vue/24/outline';
 
@@ -97,6 +98,21 @@ const isCurrentRoute = (path) => {
 
     <!-- Dynamic Vertical Sidebar Menu Items -->
     <nav class="flex-1 w-full space-y-3 px-2 overflow-y-auto max-h-[calc(100vh-6rem)] no-scrollbar">
+      <!-- Dynamic CRM Engine Link -->
+      <Link 
+        href="/dynamic-crm/dashboard"
+        title="Dynamic CRM Engine"
+        :class="[
+          'flex flex-col items-center justify-center p-2 rounded-2xl transition-all text-center',
+          page.url && page.url.startsWith('/dynamic-crm')
+            ? 'bg-violet-50 text-violet-600 font-bold border border-violet-200 shadow-xs' 
+            : 'text-slate-500 hover:bg-slate-100 hover:text-slate-900'
+        ]"
+      >
+        <SparklesIcon :class="['w-5 h-5', page.url && page.url.startsWith('/dynamic-crm') ? 'text-violet-600' : 'text-violet-500']" />
+        <span class="text-[9px] font-extrabold mt-1 leading-tight line-clamp-1">Dyn CRM</span>
+      </Link>
+
       <template v-if="customNavList && customNavList.length > 0">
         <Link 
           v-for="item in customNavList"

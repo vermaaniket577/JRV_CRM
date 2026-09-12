@@ -92,6 +92,22 @@ const clearNonEssentialCookies = () => {
 };
 
 const activeTab = ref('sessions');
+
+// Inactivity Auto-Logout Management
+const savedIdleTimeout = localStorage.getItem('crm_idle_timeout_minutes') || '15';
+const idleTimeoutMinutes = ref(savedIdleTimeout);
+const idleSuccessMsg = ref('');
+
+const updateIdleTimeout = (mins) => {
+  idleTimeoutMinutes.value = mins;
+  localStorage.setItem('crm_idle_timeout_minutes', mins);
+  idleSuccessMsg.value = `Inactivity timeout updated to ${mins === 'disabled' ? 'Disabled' : mins + ' minutes'}.`;
+  setTimeout(() => idleSuccessMsg.value = '', 3500);
+};
+
+const triggerIdlePreview = () => {
+  window.dispatchEvent(new CustomEvent('crm:preview-idle-modal'));
+};
 </script>
 
 <template>
@@ -174,6 +190,18 @@ const activeTab = ref('sessions');
         >
           <AdjustmentsHorizontalIcon class="w-4 h-4" />
           UI Cookie Preferences
+        </button>
+        <button 
+          @click="activeTab = 'inactivity'" 
+          :class="[
+            'px-5 py-2.5 rounded-xl font-medium text-sm transition flex items-center gap-2',
+            activeTab === 'inactivity' 
+              ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30' 
+              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+          ]"
+        >
+          <ClockIcon class="w-4 h-4" />
+          Inactivity Security
         </button>
       </div>
 
@@ -414,6 +442,161 @@ const activeTab = ref('sessions');
               <option :value="25">25 Items per page</option>
               <option :value="50">50 Items per page</option>
             </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab 4: Inactivity & Auto-Logout Security -->
+      <div v-if="activeTab === 'inactivity'" class="space-y-6">
+        <div class="flex items-center justify-between">
+          <div>
+            <h2 class="text-lg font-semibold text-white flex items-center gap-2">
+              <span>Automatic Inactivity Logout</span>
+              <span class="px-2.5 py-0.5 text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-full">
+                Active Guard
+              </span>
+            </h2>
+            <p class="text-xs text-slate-400">
+              Configure automatic session termination when there is no detected user activity in the CRM.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            @click="triggerIdlePreview"
+            class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-semibold transition flex items-center gap-2 shadow cursor-pointer"
+          >
+            <ClockIcon class="w-4 h-4" />
+            <span>Preview Inactivity Modal</span>
+          </button>
+        </div>
+
+        <div v-if="idleSuccessMsg" class="p-3 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs rounded-xl flex items-center gap-2">
+          <CheckCircleIcon class="w-4 h-4 shrink-0" />
+          <span>{{ idleSuccessMsg }}</span>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <!-- Timeout Duration Configuration -->
+          <div class="md:col-span-2 bg-slate-900 border border-slate-800 p-6 rounded-2xl space-y-5">
+            <h3 class="text-sm font-semibold text-white">Inactivity Idle Duration</h3>
+            <p class="text-xs text-slate-400 leading-relaxed">
+              If no mouse movement, keyboard typing, clicks, or scrolling are detected within this period, a 60-second warning countdown will appear before securely logging out.
+            </p>
+
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <button
+                type="button"
+                @click="updateIdleTimeout('5')"
+                :class="[
+                  'p-4 rounded-xl border text-center transition space-y-1 cursor-pointer',
+                  idleTimeoutMinutes === '5'
+                    ? 'bg-indigo-600/20 border-indigo-500 text-indigo-300 ring-1 ring-indigo-500/50'
+                    : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'
+                ]"
+              >
+                <div class="text-lg font-bold">5 Mins</div>
+                <div class="text-[10px] text-slate-400">High Security</div>
+              </button>
+
+              <button
+                type="button"
+                @click="updateIdleTimeout('15')"
+                :class="[
+                  'p-4 rounded-xl border text-center transition space-y-1 cursor-pointer relative',
+                  idleTimeoutMinutes === '15'
+                    ? 'bg-indigo-600/20 border-indigo-500 text-indigo-300 ring-1 ring-indigo-500/50'
+                    : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'
+                ]"
+              >
+                <span class="absolute -top-2 right-2 px-1.5 py-0.2 bg-indigo-500 text-white text-[9px] rounded-full font-bold">Default</span>
+                <div class="text-lg font-bold">15 Mins</div>
+                <div class="text-[10px] text-slate-400">Recommended</div>
+              </button>
+
+              <button
+                type="button"
+                @click="updateIdleTimeout('30')"
+                :class="[
+                  'p-4 rounded-xl border text-center transition space-y-1 cursor-pointer',
+                  idleTimeoutMinutes === '30'
+                    ? 'bg-indigo-600/20 border-indigo-500 text-indigo-300 ring-1 ring-indigo-500/50'
+                    : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'
+                ]"
+              >
+                <div class="text-lg font-bold">30 Mins</div>
+                <div class="text-[10px] text-slate-400">Standard Office</div>
+              </button>
+
+              <button
+                type="button"
+                @click="updateIdleTimeout('60')"
+                :class="[
+                  'p-4 rounded-xl border text-center transition space-y-1 cursor-pointer',
+                  idleTimeoutMinutes === '60'
+                    ? 'bg-indigo-600/20 border-indigo-500 text-indigo-300 ring-1 ring-indigo-500/50'
+                    : 'bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700'
+                ]"
+              >
+                <div class="text-lg font-bold">60 Mins</div>
+                <div class="text-[10px] text-slate-400">Extended</div>
+              </button>
+            </div>
+
+            <div class="pt-2 border-t border-slate-800 flex items-center justify-between">
+              <div>
+                <div class="text-xs font-semibold text-slate-300">Disable Auto-Logout</div>
+                <p class="text-[11px] text-slate-500">Not recommended for shared or public computers.</p>
+              </div>
+              <button
+                type="button"
+                @click="updateIdleTimeout(idleTimeoutMinutes === 'disabled' ? '15' : 'disabled')"
+                :class="[
+                  'px-3 py-1.5 rounded-lg text-xs font-medium border transition cursor-pointer',
+                  idleTimeoutMinutes === 'disabled'
+                    ? 'bg-red-600/20 text-red-400 border-red-500/40'
+                    : 'bg-slate-800 text-slate-400 border-slate-700 hover:text-white'
+                ]"
+              >
+                {{ idleTimeoutMinutes === 'disabled' ? 'Disabled (Click to Enable)' : 'Disable Auto-Logout' }}
+              </button>
+            </div>
+          </div>
+
+          <!-- Security Status Overview -->
+          <div class="bg-slate-900 border border-slate-800 p-6 rounded-2xl space-y-4">
+            <h3 class="text-sm font-semibold text-white flex items-center gap-2">
+              <ShieldCheckIcon class="w-4 h-4 text-emerald-400" />
+              <span>Inactivity Guard Status</span>
+            </h3>
+
+            <div class="space-y-3 text-xs">
+              <div class="flex items-center justify-between p-2.5 bg-slate-950 rounded-xl border border-slate-800/80">
+                <span class="text-slate-400">Status</span>
+                <span class="font-semibold" :class="idleTimeoutMinutes !== 'disabled' ? 'text-emerald-400' : 'text-red-400'">
+                  {{ idleTimeoutMinutes !== 'disabled' ? 'Active' : 'Disabled' }}
+                </span>
+              </div>
+
+              <div class="flex items-center justify-between p-2.5 bg-slate-950 rounded-xl border border-slate-800/80">
+                <span class="text-slate-400">Warning Window</span>
+                <span class="font-mono text-amber-400 font-semibold">60 seconds</span>
+              </div>
+
+              <div class="flex items-center justify-between p-2.5 bg-slate-950 rounded-xl border border-slate-800/80">
+                <span class="text-slate-400">Multi-Tab Sync</span>
+                <span class="font-semibold text-indigo-400">Enabled</span>
+              </div>
+
+              <div class="flex items-center justify-between p-2.5 bg-slate-950 rounded-xl border border-slate-800/80">
+                <span class="text-slate-400">Heartbeat Ping</span>
+                <span class="font-semibold text-emerald-400">/keep-alive</span>
+              </div>
+            </div>
+
+            <p class="text-[11px] text-slate-500 leading-normal pt-2">
+              Activity across all tabs for your user session resets the timer synchronously.
+            </p>
           </div>
         </div>
       </div>

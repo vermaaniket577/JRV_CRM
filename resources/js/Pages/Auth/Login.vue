@@ -1,14 +1,25 @@
 <script setup>
-import { ref } from 'vue';
-import { useForm, Head, Link } from '@inertiajs/vue3';
-import { SparklesIcon, ArrowRightIcon, LockClosedIcon, EnvelopeIcon, EyeIcon, EyeSlashIcon } from '@heroicons/vue/24/outline';
+import { ref, onMounted } from 'vue';
+import { useForm, Head, Link, usePage } from '@inertiajs/vue3';
+import { SparklesIcon, ArrowRightIcon, LockClosedIcon, EnvelopeIcon, EyeIcon, EyeSlashIcon, ClockIcon } from '@heroicons/vue/24/outline';
 
+const page = usePage();
 const showPassword = ref(false);
+const isInactivityTimeout = ref(false);
 
 const form = useForm({
   email: '',
   password: '',
   remember: false,
+});
+
+onMounted(() => {
+  const urlParams = new URLSearchParams(window.location.search);
+  const isTimeout = urlParams.get('timeout') === '1' || sessionStorage.getItem('crm_logout_reason') === 'inactivity' || Boolean(page.props.flash?.info);
+  if (isTimeout) {
+    isInactivityTimeout.value = true;
+    sessionStorage.removeItem('crm_logout_reason');
+  }
 });
 
 const submit = () => {
@@ -27,6 +38,22 @@ const submit = () => {
     <div class="absolute bottom-1/4 right-1/4 w-[350px] h-[350px] bg-red-400/5 rounded-full blur-3xl pointer-events-none"></div>
 
     <div class="max-w-md w-full relative z-10 space-y-6">
+      <!-- Inactivity Timeout Banner -->
+      <div 
+        v-if="isInactivityTimeout"
+        class="p-4 rounded-2xl bg-amber-50 border border-amber-200/90 shadow-sm flex items-start gap-3 transition-all animate-fade-in"
+      >
+        <div class="p-2 bg-amber-100 text-amber-700 rounded-xl shrink-0">
+          <ClockIcon class="w-5 h-5" />
+        </div>
+        <div class="space-y-0.5 min-w-0">
+          <div class="text-sm font-semibold text-amber-900">Session Expired Due to Inactivity</div>
+          <p class="text-xs text-amber-700 leading-relaxed">
+            You were automatically signed out because no activity was detected in your CRM workspace. Please sign in again to continue.
+          </p>
+        </div>
+      </div>
+
       <!-- Logo & Title -->
       <div class="text-center space-y-2">
         <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-red-50 border border-red-100 text-xs font-semibold text-red-700">

@@ -73,6 +73,10 @@ class AdminLoginController extends Controller
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 
+        if ($request->input('reason') === 'inactivity' || $request->query('reason') === 'inactivity') {
+            return redirect()->route('admin.login', ['timeout' => 1])->with('info', 'You were automatically logged out due to inactivity.');
+        }
+
         return redirect()->route('admin.login')->with('success', 'Logged out from Master Admin Panel.');
     }
 }

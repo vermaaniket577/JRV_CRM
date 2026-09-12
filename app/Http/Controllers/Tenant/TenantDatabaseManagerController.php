@@ -3,14 +3,24 @@
 namespace App\Http\Controllers\Tenant;
 
 use App\Http\Controllers\Controller;
+use App\Models\Contact;
+use App\Models\ImportLog;
+use App\Models\Industry;
+use App\Models\Member;
+use App\Models\NavigationItem;
+use App\Models\Property;
 use App\Models\Tenant;
 use App\Models\TenantCrmRecord;
 use App\Models\TenantCustomColumn;
+use App\Models\TenantSetting;
+use App\Services\IndustryConfigurationService;
 use App\Services\TenantDatabaseService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -24,11 +34,32 @@ class TenantDatabaseManagerController extends Controller
         $this->databaseService = $databaseService;
     }
 
+    protected function resolveCurrentTenant(Request $request): Tenant
+    {
+        $tenant = null;
+        if (app()->bound('current_tenant') && app('current_tenant')) {
+            $tenant = app('current_tenant');
+        } elseif ($request->hasSession() && $request->session()->has('tenant_id')) {
+            $tenant = Tenant::with(['industry', 'businessType'])->find($request->session()->get('tenant_id'));
+        } elseif ($request->user()?->tenant_id) {
+            $tenant = Tenant::with(['industry', 'businessType'])->find($request->user()->tenant_id);
+        }
+
+        if (!$tenant) {
+            $tenant = Tenant::with(['industry', 'businessType'])->where('subdomain', 'like', '%unlockrentals%')->first() 
+                ?? Tenant::with(['industry', 'businessType'])->first();
+        }
+
+        if ($tenant && $request->hasSession()) {
+            $request->session()->put('tenant_id', $tenant->id);
+        }
+
+        return $tenant;
+    }
+
     public function index(Request $request): Response
     {
-        $user = $request->user();
-        $tenantId = session('tenant_id') ?? $user?->tenant_id;
-        $tenant = Tenant::with(['industry', 'businessType'])->findOrFail($tenantId);
+        $tenant = $this->resolveCurrentTenant($request);
 
         // Fetch columns
         $columns = TenantCustomColumn::where('tenant_id', $tenant->id)
@@ -42,6 +73,39 @@ class TenantDatabaseManagerController extends Controller
             $columns = TenantCustomColumn::where('tenant_id', $tenant->id)
                 ->orderBy('display_order')
                 ->get();
+        }
+
+        // Auto-discover any columns from custom_data not yet registered in TenantCustomColumn
+        $existingKeys = $columns->pluck('column_key')->toArray();
+        $sampleRecords = TenantCrmRecord::where('tenant_id', $tenant->id)->latest()->take(30)->get();
+        $newColsToRegister = [];
+        $maxOrder = $columns->max('display_order') ?? 0;
+
+        foreach ($sampleRecords as $sr) {
+            if (is_array($sr->custom_data)) {
+                foreach (array_keys($sr->custom_data) as $k) {
+                    if (!in_array(strtolower($k), ['id', 'created_at', 'updated_at', 'deleted_at', 'tenant_id']) && !in_array($k, $existingKeys) && !in_array($k, array_keys($newColsToRegister))) {
+                        $newColsToRegister[$k] = [
+                            'tenant_id' => $tenant->id,
+                            'table_name' => 'crm_leads',
+                            'column_key' => $k,
+                            'column_label' => Str::title(str_replace('_', ' ', $k)),
+                            'column_type' => str_contains(strtolower($k), 'email') ? 'email' : (str_contains(strtolower($k), 'phone') ? 'phone' : (str_contains(strtolower($k), 'price') || str_contains(strtolower($k), 'value') || str_contains(strtolower($k), 'amount') ? 'currency' : 'text')),
+                            'is_required' => false,
+                            'is_default' => false,
+                            'is_visible' => true,
+                            'display_order' => ++$maxOrder,
+                        ];
+                    }
+                }
+            }
+        }
+
+        if (!empty($newColsToRegister)) {
+            foreach ($newColsToRegister as $colDef) {
+                TenantCustomColumn::create($colDef);
+            }
+            $columns = TenantCustomColumn::where('tenant_id', $tenant->id)->orderBy('display_order')->get();
         }
 
         // Fetch records with search & filter
@@ -310,5 +374,437 @@ class TenantDatabaseManagerController extends Controller
 
             fclose($handle);
         }, 200, $headers);
+    }
+
+    /**
+     * Upload database file (.sql, .csv, .xlsx, .json), create dynamic tables/columns, and populate CRM data
+     */
+    /**
+     * Upload database file (.sql, .csv, .xlsx, .json), create dynamic tables/columns,
+     * intelligently detect the sector, and automatically convert the CRM to match the uploaded database.
+     */
+    public function uploadDatabase(Request $request): RedirectResponse
+    {
+        $request->validate([
+            'file' => ['required', 'file', 'max:102400'], // up to 100MB
+        ]);
+
+        $tenant = $this->resolveCurrentTenant($request);
+
+        $file = $request->file('file');
+        $ext = strtolower($file->getClientOriginalExtension());
+        $filePath = $file->getRealPath();
+
+        $importedColsCount = 0;
+        $importedRowsCount = 0;
+
+        $baseFileName = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
+        $tableName = Str::snake(preg_replace('/[^a-zA-Z0-9_]/', '_', $baseFileName)) ?: 'crm_leads';
+
+        $columnsData = [];
+        $importedRows = [];
+
+        try {
+            if (in_array($ext, ['sql', 'dump'])) {
+                $deployService = app(\App\Services\SqlDatabaseDeploymentService::class);
+                $result = $deployService->deploySqlFile($tenant, $filePath, $file->getClientOriginalName(), $request->user()?->id);
+
+                $industryNotice = $result['detected_industry']
+                    ? "Your CRM has been automatically converted to '{$result['detected_industry']->name}' according to your database!"
+                    : "Database table '{$result['primary_table']}' successfully configured in your CRM!";
+
+                return redirect()->route('tenant.crm-records.index')->with(
+                    'success',
+                    "{$industryNotice} Successfully deployed table '{$result['primary_table']}' into database `{$result['database_name']}`, registered {$result['columns_registered']} custom columns and loaded {$result['rows_deployed']} records."
+                );
+            } else {
+                // Spreadsheet (XLSX, XLS, CSV, TSV, JSON)
+                $importService = app(\App\Services\UniversalImportService::class);
+                $importedRows = $importService->parseFile($file);
+
+                if (empty($importedRows)) {
+                    return redirect()->back()->with('error', 'No rows found in the uploaded file.');
+                }
+
+                $firstRow = (array)$importedRows[0];
+
+                foreach (array_keys($firstRow) as $colKey) {
+                    if (in_array(strtolower($colKey), ['id', 'created_at', 'updated_at'])) continue;
+
+                    $dataType = 'text';
+                    $lower = strtolower($colKey);
+                    if (str_contains($lower, 'email')) {
+                        $dataType = 'email';
+                    } elseif (str_contains($lower, 'phone') || str_contains($lower, 'mobile') || str_contains($lower, 'contact')) {
+                        $dataType = 'phone';
+                    } elseif (str_contains($lower, 'price') || str_contains($lower, 'rent') || str_contains($lower, 'amount') || str_contains($lower, 'salary') || str_contains($lower, 'fee') || str_contains($lower, 'deposit')) {
+                        $dataType = 'currency';
+                    } elseif (str_contains($lower, 'date') || str_contains($lower, 'dob') || str_contains($lower, 'year')) {
+                        $dataType = 'date';
+                    } elseif (str_contains($lower, 'age') || str_contains($lower, 'count') || str_contains($lower, 'bhk') || str_contains($lower, 'bedroom') || str_contains($lower, 'area')) {
+                        $dataType = 'number';
+                    }
+
+                    $columnsData[] = [
+                        'key' => $colKey,
+                        'label' => Str::title(str_replace('_', ' ', $colKey)),
+                        'type' => $dataType,
+                    ];
+                }
+            }
+
+            // Intelligently detect sector and automatically convert tenant CRM
+            $detectedIndustry = $this->detectAndConvertCrm($tenant, $tableName, $columnsData, $importedRows, $file->getClientOriginalName());
+            $tenant->refresh();
+
+            // Register columns in TenantCustomColumn
+            $existingKeys = TenantCustomColumn::where('tenant_id', $tenant->id)->pluck('column_key')->toArray();
+            $maxOrder = TenantCustomColumn::where('tenant_id', $tenant->id)->max('display_order') ?? 0;
+
+            foreach ($columnsData as $c) {
+                if (!in_array($c['key'], $existingKeys)) {
+                    TenantCustomColumn::create([
+                        'tenant_id' => $tenant->id,
+                        'table_name' => $tableName,
+                        'column_key' => $c['key'],
+                        'column_label' => $c['label'],
+                        'column_type' => $c['type'],
+                        'is_required' => false,
+                        'is_default' => false,
+                        'is_visible' => true,
+                        'display_order' => ++$maxOrder,
+                    ]);
+                    $importedColsCount++;
+                }
+            }
+
+            // Insert into TenantCrmRecord and sync to sector tables
+            if (!empty($importedRows)) {
+                foreach ($importedRows as $row) {
+                    $rowArr = (array)$row;
+                    $cName = $rowArr['name'] ?? $rowArr['contact_name'] ?? $rowArr['title'] ?? $rowArr['full_name'] ?? $rowArr['first_name'] ?? null;
+                    if (!$cName) {
+                        foreach ($rowArr as $k => $v) {
+                            if (is_string($v) && strlen($v) > 1 && !in_array($k, ['id', 'email', 'phone', 'status'])) {
+                                $cName = $v;
+                                break;
+                            }
+                        }
+                    }
+
+                    TenantCrmRecord::create([
+                        'tenant_id' => $tenant->id,
+                        'title' => $cName ?: 'Imported Record',
+                        'contact_name' => $cName ?: 'Imported Record',
+                        'email' => $rowArr['email'] ?? $rowArr['mail'] ?? null,
+                        'phone' => $rowArr['phone'] ?? $rowArr['mobile'] ?? $rowArr['contact'] ?? null,
+                        'company' => $rowArr['company'] ?? $rowArr['org'] ?? $rowArr['organization'] ?? null,
+                        'status' => $rowArr['status'] ?? 'New Lead',
+                        'value' => (float)($rowArr['value'] ?? $rowArr['price'] ?? $rowArr['rent'] ?? $rowArr['amount'] ?? 0),
+                        'custom_data' => $rowArr,
+                        'created_by' => $request->user()?->id,
+                    ]);
+
+                    $this->syncSectorEntity($tenant, $rowArr, $tableName, $detectedIndustry);
+                    $importedRowsCount++;
+                }
+            }
+
+            ImportLog::create([
+                'tenant_id' => $tenant->id,
+                'import_source' => strtoupper($ext) . ' Database Upload',
+                'entity_type' => 'crm_database_table',
+                'file_name' => $file->getClientOriginalName(),
+                'total_rows' => $importedRowsCount,
+                'imported_rows' => $importedRowsCount,
+                'failed_rows' => 0,
+                'status' => 'Completed',
+                'summary' => "Created database table '{$tableName}' with {$importedColsCount} schema columns and loaded {$importedRowsCount} records into CRM.",
+            ]);
+
+            $industryNotice = $detectedIndustry 
+                ? "Your CRM has been automatically converted to '{$detectedIndustry->name}' according to your database!"
+                : "Database table '{$tableName}' successfully configured in your CRM!";
+
+            return redirect()->route('tenant.crm-records.index')->with(
+                'success',
+                "{$industryNotice} Registered {$importedColsCount} columns and loaded {$importedRowsCount} records."
+            );
+        } catch (\Throwable $e) {
+            return redirect()->back()->with('error', 'Database Table Creation Error: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Intelligently detect sector from uploaded database schema, table, and data,
+     * and convert the tenant's CRM configuration (industry, navigation, pipeline, settings).
+     */
+    protected function detectAndConvertCrm(Tenant $tenant, string $tableName, array $columnsData, array $importedRows, string $fileName): ?Industry
+    {
+        $indicators = [
+            'real-estate' => [
+                'table' => ['propert', 'flat', 'apartment', 'listing', 'rent', 'bhk', 'villa', 'housing', 'plot', 'estate', 'realt'],
+                'columns' => ['bhk', 'bedroom', 'bathroom', 'carpet_area', 'sqft', 'furnishing', 'locality', 'property_type', 'property_code', 'listing_type', 'rent', 'deposit', 'possession', 'floor', 'amenities', 'owner_name', 'owner_phone', 'builtup'],
+            ],
+            'education' => [
+                'table' => ['course', 'student', 'admission', 'college', 'school', 'university', 'academic', 'curriculum', 'enrollment', 'tuition'],
+                'columns' => ['course', 'student', 'admission', 'enrollment', 'degree', 'semester', 'grade', 'syllabus', 'counselor', 'fees', 'tuition', 'passing_year', 'qualification', 'marks', 'percentage', 'board'],
+            ],
+            'healthcare' => [
+                'table' => ['patient', 'doctor', 'appointment', 'treatment', 'clinic', 'hospital', 'medical', 'prescription', 'diagnos'],
+                'columns' => ['patient', 'doctor', 'treatment', 'appointment', 'diagnosis', 'prescription', 'blood_group', 'symptoms', 'disease', 'dosage', 'specialization', 'ward', 'bed', 'physician', 'clinic'],
+            ],
+            'matrimonial' => [
+                'table' => ['biodata', 'matrimonial', 'match', 'bride', 'groom', 'profiles', 'community'],
+                'columns' => ['gotra', 'sub_caste', 'caste', 'rashi', 'nakshatra', 'kundali', 'manglik', 'marital_status', 'biodata', 'mother_gotra', 'family_type', 'complexion', 'horoscope', 'partner_preference'],
+            ],
+            'recruitment' => [
+                'table' => ['job', 'candidate', 'resume', 'applicant', 'vacancy', 'placement', 'interview', 'hiring', 'recruitment'],
+                'columns' => ['job_title', 'candidate_name', 'resume', 'current_ctc', 'expected_ctc', 'notice_period', 'skills', 'experience_years', 'interview_round', 'recruiter', 'hiring_manager', 'applicant_id'],
+            ],
+            'legal' => [
+                'table' => ['case', 'hearing', 'court', 'lawyer', 'advocate', 'petition', 'litigation', 'legal'],
+                'columns' => ['case_number', 'court_name', 'hearing_date', 'judge', 'advocate', 'petitioner', 'respondent', 'matter_type', 'legal_fee', 'bench'],
+            ],
+            'research-publication' => [
+                'table' => ['manuscript', 'journal', 'paper', 'article', 'publication', 'submission'],
+                'columns' => ['manuscript_title', 'doi', 'journal_name', 'volume', 'issue', 'scopus', 'apc_fee', 'peer_review', 'abstract', 'keywords', 'author_email'],
+            ],
+            'automobile' => [
+                'table' => ['vehicle', 'car', 'automobile', 'fleet', 'bike', 'motor', 'dealership'],
+                'columns' => ['vin', 'odometer', 'make', 'model', 'fuel_type', 'chassis', 'registration_no', 'transmission', 'engine_capacity', 'mileage'],
+            ],
+            'ecommerce' => [
+                'table' => ['product', 'order', 'sku', 'inventory', 'item', 'catalog', 'merchandise'],
+                'columns' => ['sku', 'product_name', 'unit_price', 'stock_quantity', 'barcode', 'reorder_level', 'supplier', 'weight_kg'],
+            ],
+            'insurance' => [
+                'table' => ['policy', 'claim', 'insurance', 'underwriting', 'insured'],
+                'columns' => ['policy_no', 'sum_insured', 'premium', 'claim_amount', 'policy_type', 'nominee', 'insured_name', 'tenure'],
+            ],
+            'banking-finance' => [
+                'table' => ['loan', 'account', 'banking', 'finance', 'borrower'],
+                'columns' => ['loan_amount', 'interest_rate', 'account_no', 'cibil_score', 'collateral', 'emi', 'borrower_name'],
+            ],
+        ];
+
+        $scores = array_fill_keys(array_keys($indicators), 0);
+
+        $cleanTableName = strtolower(trim(preg_replace('/[^a-zA-Z0-9]/', ' ', $tableName)));
+        $cleanFileName = strtolower(trim(preg_replace('/[^a-zA-Z0-9]/', ' ', $fileName)));
+        $columnKeys = array_map('strtolower', array_column($columnsData, 'key'));
+
+        foreach ($indicators as $sector => $data) {
+            // Check Table Name
+            foreach ($data['table'] as $kw) {
+                if (str_contains($cleanTableName, $kw)) {
+                    $scores[$sector] += 8;
+                }
+                if (str_contains($cleanFileName, $kw)) {
+                    $scores[$sector] += 5;
+                }
+            }
+
+            // Check Columns
+            foreach ($columnKeys as $col) {
+                foreach ($data['columns'] as $kw) {
+                    if (str_contains($col, $kw)) {
+                        $scores[$sector] += 3;
+                        break;
+                    }
+                }
+            }
+
+            // Check Sample Data
+            $sampleValues = [];
+            foreach (array_slice($importedRows, 0, 10) as $row) {
+                foreach ((array)$row as $val) {
+                    if (is_string($val) && strlen($val) > 2 && strlen($val) < 50) {
+                        $sampleValues[] = strtolower($val);
+                    }
+                }
+            }
+
+            foreach ($sampleValues as $val) {
+                foreach ($data['columns'] as $kw) {
+                    if (str_contains($val, $kw)) {
+                        $scores[$sector] += 1;
+                        break;
+                    }
+                }
+            }
+        }
+
+        arsort($scores);
+        $bestSlug = array_key_first($scores);
+        $highestScore = $scores[$bestSlug];
+
+        $industry = null;
+        if ($highestScore >= 3) {
+            $industry = Industry::where('slug', $bestSlug)->first();
+        }
+
+        if ($industry) {
+            // Switch tenant's industry and re-provision modules, navigation, pipeline
+            $configService = new IndustryConfigurationService();
+            $configService->switchIndustry($tenant, $industry);
+
+            TenantSetting::setByKey('industry_name', $industry->name, $tenant->id);
+            TenantSetting::setByKey('industry_slug', $industry->slug, $tenant->id);
+            TenantSetting::setByKey('industry_color', $industry->color, $tenant->id);
+            TenantSetting::setByKey('active_crm_table', $tableName, $tenant->id);
+            $tenant->refresh();
+        }
+
+        // Add prominent Navigation Item pointing to this uploaded CRM Database Table
+        $cleanLabel = Str::title(str_replace(['_', '-'], ' ', $tableName));
+        if (in_array(strtolower($cleanLabel), ['crm leads', 'imported record', 'imported records', 'data', 'sheet1', 'table'])) {
+            $cleanLabel = $industry ? ($industry->name . ' Data') : 'CRM Data';
+        }
+
+        NavigationItem::updateOrCreate(
+            ['tenant_id' => $tenant->id, 'key' => 'tenant_crm_database'],
+            [
+                'label' => $cleanLabel,
+                'icon' => 'CircleStackIcon',
+                'route' => '/tenant/crm-records',
+                'display_order' => 2, // Right after Dashboard
+                'is_enabled' => true,
+            ]
+        );
+
+        return $industry;
+    }
+
+    /**
+     * Intelligently sync imported database rows into Sector Tables (Properties, Contacts, Members, Leads)
+     */
+    protected function syncSectorEntity(Tenant $tenant, array $rowArr, ?string $tableName = null, ?Industry $detectedIndustry = null): void
+    {
+        $industrySlug = $detectedIndustry?->slug ?? $tenant->industry?->slug;
+
+        $cName = $rowArr['name'] ?? $rowArr['contact_name'] ?? $rowArr['title'] ?? $rowArr['full_name'] ?? $rowArr['first_name'] ?? null;
+        $email = $rowArr['email'] ?? $rowArr['mail'] ?? $rowArr['client_email'] ?? null;
+        $phone = $rowArr['phone'] ?? $rowArr['mobile'] ?? $rowArr['contact'] ?? $rowArr['contact_phone'] ?? null;
+
+        // 1. Property listings sync (Real Estate)
+        $isProperty = ($industrySlug === 'real-estate')
+            || in_array(strtolower((string)$tableName), ['properties', 'property', 'real_estate', 'listings', 'flats', 'units', 'apartments'])
+            || isset($rowArr['property_type'])
+            || isset($rowArr['bedrooms'])
+            || isset($rowArr['bhk'])
+            || isset($rowArr['carpet_area_sqft'])
+            || (isset($rowArr['locality']) && isset($rowArr['price']));
+
+        if ($isProperty) {
+            $propTitle = $rowArr['title'] ?? $rowArr['property_name'] ?? $rowArr['name'] ?? $rowArr['unit_name'] ?? $rowArr['property_title'] ?? 'Real Estate Property';
+            $pType = $rowArr['property_type'] ?? $rowArr['type'] ?? 'Apartment';
+            $pCount = Property::where('tenant_id', $tenant->id)->count() + 1;
+            $pCode = $rowArr['property_code'] ?? ('PROP-' . strtoupper(substr(preg_replace('/[^a-zA-Z]/', '', $pType) ?: 'PRP', 0, 3)) . '-' . str_pad($pCount, 4, '0', STR_PAD_LEFT));
+            $bhk = $rowArr['bedrooms'] ?? $rowArr['bhk'] ?? 2;
+
+            Property::updateOrCreate(
+                ['tenant_id' => $tenant->id, 'title' => $propTitle],
+                [
+                    'property_code' => $pCode,
+                    'listing_type' => $rowArr['listing_type'] ?? $rowArr['purpose'] ?? 'For Rent',
+                    'property_type' => $pType,
+                    'price' => (float)($rowArr['price'] ?? $rowArr['rent'] ?? $rowArr['amount'] ?? 25000),
+                    'security_deposit' => (float)($rowArr['security_deposit'] ?? $rowArr['deposit'] ?? 50000),
+                    'bedrooms' => is_numeric($bhk) ? (int)$bhk : 2,
+                    'bathrooms' => (int)($rowArr['bathrooms'] ?? 2),
+                    'carpet_area_sqft' => (int)($rowArr['carpet_area_sqft'] ?? $rowArr['area'] ?? 850),
+                    'furnishing_status' => $rowArr['furnishing_status'] ?? $rowArr['furnishing'] ?? 'Semi-Furnished',
+                    'locality' => $rowArr['locality'] ?? $rowArr['location'] ?? $rowArr['address'] ?? 'Prime Area',
+                    'city' => $rowArr['city'] ?? 'Mumbai',
+                    'state' => $rowArr['state'] ?? 'Maharashtra',
+                    'owner_name' => $rowArr['owner_name'] ?? $rowArr['owner'] ?? 'Property Owner',
+                    'owner_phone' => $rowArr['owner_phone'] ?? $phone ?? '+91 9800000000',
+                    'owner_email' => $rowArr['owner_email'] ?? $email ?? null,
+                    'status' => $rowArr['status'] ?? 'Available',
+                ]
+            );
+        }
+
+        // 2. Matrimonial Members sync
+        $isMember = ($industrySlug === 'matrimonial')
+            || in_array(strtolower((string)$tableName), ['members', 'biodata', 'matrimonial', 'profiles'])
+            || isset($rowArr['gotra'])
+            || isset($rowArr['caste'])
+            || isset($rowArr['rashi']);
+
+        if ($isMember) {
+            $mCode = 'MBR-' . str_pad(Member::where('tenant_id', $tenant->id)->count() + 1, 4, '0', STR_PAD_LEFT);
+            $fullName = $cName ?: 'Community Member';
+            $nameParts = explode(' ', trim($fullName), 2);
+
+            Member::updateOrCreate(
+                ['tenant_id' => $tenant->id, 'phone' => $phone ?: ('+91 98' . rand(10000000, 99999999))],
+                [
+                    'member_code' => $rowArr['member_code'] ?? $mCode,
+                    'first_name' => $nameParts[0],
+                    'last_name' => $nameParts[1] ?? '',
+                    'gender' => $rowArr['gender'] ?? 'Male',
+                    'age' => (int)($rowArr['age'] ?? 26),
+                    'marital_status' => $rowArr['marital_status'] ?? 'Never Married',
+                    'religion' => $rowArr['religion'] ?? 'Hindu',
+                    'caste' => $rowArr['caste'] ?? 'General',
+                    'sub_caste' => $rowArr['sub_caste'] ?? null,
+                    'gotra' => $rowArr['gotra'] ?? null,
+                    'education_level' => $rowArr['education'] ?? $rowArr['degree'] ?? 'Graduate',
+                    'occupation_type' => $rowArr['occupation'] ?? $rowArr['profession'] ?? 'Private Sector',
+                    'annual_income' => (float)($rowArr['annual_income'] ?? $rowArr['income'] ?? 600000),
+                    'city' => $rowArr['city'] ?? 'Mumbai',
+                    'state' => $rowArr['state'] ?? 'Maharashtra',
+                    'email' => $email,
+                    'verification_status' => 'Verified',
+                ]
+            );
+        }
+
+        // 3. Contacts & Universal Leads sync
+        if ($cName || !empty($email) || !empty($phone)) {
+            $parts = preg_split('/\s+/', trim($cName ?: 'Contact'), 2);
+            $cEmail = $email ?: ('contact_' . Str::random(6) . '@example.com');
+
+            $jobTitle = $rowArr['designation'] ?? $rowArr['job_title'] ?? null;
+            if (!$jobTitle && $industrySlug === 'education') {
+                $jobTitle = $rowArr['course'] ?? $rowArr['course_name'] ?? 'Student';
+            } elseif (!$jobTitle && $industrySlug === 'healthcare') {
+                $jobTitle = $rowArr['doctor'] ?? $rowArr['treatment'] ?? 'Patient';
+            }
+
+            Contact::updateOrCreate(
+                ['tenant_id' => $tenant->id, 'email' => $cEmail],
+                [
+                    'first_name' => $parts[0] ?? 'Contact',
+                    'last_name' => $parts[1] ?? '',
+                    'phone' => $phone ?? '',
+                    'job_title' => $jobTitle,
+                    'status' => $rowArr['status'] ?? 'Active',
+                ]
+            );
+
+            if (Schema::hasTable('crm_sales_leads')) {
+                try {
+                    DB::table('crm_sales_leads')->updateOrInsert(
+                        ['email' => $cEmail],
+                        [
+                            'tenant_id' => $tenant->id,
+                            'customer_name' => $cName ?: 'Client Lead',
+                            'company_name' => $rowArr['company'] ?? $rowArr['org'] ?? null,
+                            'phone' => $phone ?: '',
+                            'industry' => $industrySlug ?: 'general',
+                            'deal_stage' => $rowArr['deal_stage'] ?? $rowArr['stage'] ?? $rowArr['status'] ?? 'New Lead',
+                            'estimated_mrr' => (float)($rowArr['value'] ?? $rowArr['deal_value'] ?? $rowArr['price'] ?? $rowArr['rent'] ?? $rowArr['amount'] ?? 0),
+                            'created_at' => now(),
+                            'updated_at' => now(),
+                        ]
+                    );
+                } catch (\Throwable $e) {
+                    // Non-critical background lead sync
+                }
+            }
+        }
     }
 }

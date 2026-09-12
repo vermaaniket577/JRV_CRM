@@ -1,8 +1,9 @@
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { useForm, Head, router } from '@inertiajs/vue3';
 import Navbar from '@/Components/Navbar.vue';
 import GlobalSearchModal from '@/Components/GlobalSearchModal.vue';
+import UploadDatabaseModal from '@/Components/UploadDatabaseModal.vue';
 import {
   CircleStackIcon,
   TableCellsIcon,
@@ -33,8 +34,19 @@ const props = defineProps({
 const isSearchOpen = ref(false);
 const isAddRecordModalOpen = ref(false);
 const isAddColumnModalOpen = ref(false);
+const isUploadDbModalOpen = ref(false);
 const searchQuery = ref(props.filters?.search || '');
 const statusFilter = ref(props.filters?.status || 'all');
+const showOnboardingSuccess = ref(false);
+
+onMounted(() => {
+  if (typeof window !== 'undefined') {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('onboarding_success') === '1') {
+      showOnboardingSuccess.value = true;
+    }
+  }
+});
 
 // Form for adding new record with dynamic fields
 const recordForm = useForm({});
@@ -107,7 +119,7 @@ const filterByStatus = (status) => {
 </script>
 
 <template>
-  <Head :title="`CRM Database & Custom Columns - ${tenant?.name || 'Workspace'}`" />
+  <Head :title="`CRM Data & Records - ${tenant?.name || 'Workspace'}`" />
 
   <div class="min-h-screen bg-slate-100 flex font-sans text-slate-900">
     <!-- Navbar (Fixed Left Sidebar) -->
@@ -122,11 +134,11 @@ const filterByStatus = (status) => {
           
           <div class="flex items-center gap-3.5">
             <div class="w-11 h-11 rounded-2xl bg-red-600/10 border border-red-200 text-red-600 flex items-center justify-center font-bold text-xl shadow-xs">
-              <CircleStackIcon class="w-6 h-6" />
+              <TableCellsIcon class="w-6 h-6" />
             </div>
             <div>
               <div class="flex items-center gap-2.5">
-                <h1 class="text-xl font-bold text-slate-900 tracking-tight">{{ tenant?.name || 'My CRM' }} Database Hub</h1>
+                <h1 class="text-xl font-bold text-slate-900 tracking-tight">{{ tenant?.name || 'My CRM' }} CRM Data & Records Hub</h1>
                 <span class="px-3 py-1 rounded-full text-xs font-semibold uppercase bg-emerald-50 text-emerald-700 border border-emerald-200">
                   {{ dbInfo?.status || 'Active 🟢' }}
                 </span>
@@ -139,6 +151,16 @@ const filterByStatus = (status) => {
 
           <!-- Actions -->
           <div class="flex items-center gap-3">
+            <button
+              type="button"
+              @click="isUploadDbModalOpen = true"
+              class="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-xl flex items-center gap-2 transition shadow-sm cursor-pointer"
+              title="Upload .sql database or spreadsheet to create table and populate CRM data"
+            >
+              <CircleStackIcon class="w-4 h-4 stroke-[2.5]" />
+              <span>Upload Database</span>
+            </button>
+
             <a
               href="/tenant/crm-records/export"
               class="px-4 py-2.5 bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 text-sm font-semibold rounded-xl flex items-center gap-2 transition shadow-2xs cursor-pointer"
@@ -170,6 +192,27 @@ const filterByStatus = (status) => {
 
       <!-- Main Body -->
       <main class="max-w-7xl mx-auto w-full p-6 space-y-6 flex-1">
+
+        <!-- Onboarding Success Alert Banner -->
+        <div v-if="showOnboardingSuccess" class="bg-gradient-to-r from-emerald-500/10 via-emerald-500/5 to-transparent border border-emerald-300/80 rounded-2xl p-4 sm:p-5 flex items-start justify-between gap-4 shadow-xs">
+          <div class="flex items-start gap-3.5">
+            <div class="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center text-xl shrink-0">
+              🎉
+            </div>
+            <div class="space-y-1">
+              <div class="flex items-center gap-2">
+                <h3 class="font-bold text-slate-900 text-sm sm:text-base">Workspace & Database Ready!</h3>
+                <span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-semibold text-xs border border-emerald-200">
+                  Live in CRM
+                </span>
+              </div>
+              <p class="text-xs sm:text-sm text-slate-600 leading-relaxed">
+                Your database has been deployed to your dedicated MySQL database. All schema tables, custom fields, and data records are automatically configured and displayed below.
+              </p>
+            </div>
+          </div>
+          <button @click="showOnboardingSuccess = false" class="text-slate-400 hover:text-slate-600 text-sm font-bold p-1 cursor-pointer">✕</button>
+        </div>
         
         <!-- Metrics Bar -->
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
@@ -491,5 +534,6 @@ const filterByStatus = (status) => {
 
     <!-- Global Search Modal -->
     <GlobalSearchModal :is-open="isSearchOpen" @close="isSearchOpen = false" />
+    <UploadDatabaseModal :is-open="isUploadDbModalOpen" @close="isUploadDbModalOpen = false" />
   </div>
 </template>

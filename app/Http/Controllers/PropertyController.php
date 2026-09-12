@@ -12,7 +12,17 @@ class PropertyController extends Controller
 {
     public function index(Request $request): Response
     {
+        $isSubdomain = app()->bound('is_tenant_subdomain') && app('is_tenant_subdomain');
+        $currentTenant = app()->bound('current_tenant') ? app('current_tenant') : null;
+        $tenantId = ($isSubdomain && $currentTenant) ? $currentTenant->id : (session('tenant_id') ?? $request->user()?->tenant_id);
+
         $query = Property::query();
+
+        if ($tenantId) {
+            $query->where('tenant_id', $tenantId);
+        } elseif ($isSubdomain) {
+            $query->whereRaw('1 = 0');
+        }
 
         if ($search = $request->query('query')) {
             $query->where(function ($q) use ($search) {
@@ -55,12 +65,19 @@ class PropertyController extends Controller
         $perPage = (int) $request->query('per_page', 12);
         $properties = $query->latest()->paginate($perPage)->withQueryString();
 
+        $propCountBase = Property::query();
+        if ($tenantId) {
+            $propCountBase->where('tenant_id', $tenantId);
+        } elseif ($isSubdomain) {
+            $propCountBase->whereRaw('1 = 0');
+        }
+
         $metrics = [
-            'total_properties' => Property::count(),
-            'for_rent' => Property::where('listing_type', 'For Rent')->count(),
-            'for_sale' => Property::where('listing_type', 'For Sale')->count(),
-            'available_units' => Property::where('status', 'Available')->count(),
-            'rented_or_sold' => Property::whereIn('status', ['Rented Out', 'Sold'])->count(),
+            'total_properties' => (clone $propCountBase)->count(),
+            'for_rent' => (clone $propCountBase)->where('listing_type', 'For Rent')->count(),
+            'for_sale' => (clone $propCountBase)->where('listing_type', 'For Sale')->count(),
+            'available_units' => (clone $propCountBase)->where('status', 'Available')->count(),
+            'rented_or_sold' => (clone $propCountBase)->whereIn('status', ['Rented Out', 'Sold'])->count(),
         ];
 
         return Inertia::render('RealEstate/Properties', [
@@ -72,6 +89,10 @@ class PropertyController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
+        $isSubdomain = app()->bound('is_tenant_subdomain') && app('is_tenant_subdomain');
+        $currentTenant = app()->bound('current_tenant') ? app('current_tenant') : null;
+        $tenantId = ($isSubdomain && $currentTenant) ? $currentTenant->id : (session('tenant_id') ?? $request->user()?->tenant_id);
+
         $validated = $request->validate([
             'title' => ['required', 'string', 'max:255'],
             'listing_type' => ['required', 'string', 'in:For Rent,For Sale,Lease,PG / Co-living'],
@@ -95,10 +116,11 @@ class PropertyController extends Controller
             'description' => ['nullable', 'string'],
         ]);
 
-        $count = Property::count() + 1;
+        $count = Property::where('tenant_id', $tenantId)->count() + 1;
         $code = 'PROP-' . strtoupper(substr($validated['property_type'], 0, 3)) . '-' . str_pad($count, 4, '0', STR_PAD_LEFT);
 
         Property::create(array_merge($validated, [
+            'tenant_id' => $tenantId,
             'property_code' => $code,
             'status' => $validated['status'] ?? 'Available',
         ]));
@@ -119,7 +141,18 @@ class PropertyController extends Controller
 
     public function export(Request $request)
     {
-        $properties = Property::latest()->get();
+        $isSubdomain = app()->bound('is_tenant_subdomain') && app('is_tenant_subdomain');
+        $currentTenant = app()->bound('current_tenant') ? app('current_tenant') : null;
+        $tenantId = ($isSubdomain && $currentTenant) ? $currentTenant->id : (session('tenant_id') ?? $request->user()?->tenant_id);
+
+        $query = Property::query();
+        if ($tenantId) {
+            $query->where('tenant_id', $tenantId);
+        } elseif ($isSubdomain) {
+            $query->whereRaw('1 = 0');
+        }
+
+        $properties = $query->latest()->get();
         $filename = 'properties_rentals_export_' . date('Y_m_d_His') . '.csv';
 
         $headers = [
@@ -200,6 +233,14 @@ class PropertyController extends Controller
             'file' => ['required', 'file', 'mimes:csv,txt'],
         ]);
 
+        $tenantId = session('tenant_id') ?? $request->user()?->tenant_id;
+        if (!$tenantId && app()->bound('current_tenant') && app('current_tenant')) {
+            $tenantId = app('current_tenant')->id;
+        }
+        if (!$tenantId) {
+            $tenantId = \App\Models\Tenant::where('subdomain', 'like', '%unlockrentals%')->value('id') ?? \App\Models\Tenant::value('id');
+        }
+
         $file = $request->file('file');
         $handle = fopen($file->getRealPath(), 'r');
         $header = fgetcsv($handle);
@@ -224,9 +265,10 @@ class PropertyController extends Controller
             $ownerPhone = isset($row[13]) ? trim($row[13]) : '+91 9800000000';
 
             $count = Property::count() + 1;
-            $code = 'PROP-' . strtoupper(substr($propertyType, 0, 3)) . '-' . str_pad($count, 4, '0', STR_PAD_LEFT);
+            $code = 'PROP-' . strtoupper(substr(preg_replace('/[^a-zA-Z]/', '', $propertyType) ?: 'PRP', 0, 3)) . '-' . str_pad($count, 4, '0', STR_PAD_LEFT);
 
             Property::create([
+                'tenant_id' => $tenantId,
                 'property_code' => $code,
                 'title' => $title,
                 'listing_type' => $listingType,
@@ -243,6 +285,28 @@ class PropertyController extends Controller
                 'owner_name' => $ownerName,
                 'owner_phone' => $ownerPhone,
                 'status' => 'Available',
+            ]);
+
+            \App\Models\TenantCrmRecord::create([
+                'tenant_id' => $tenantId,
+                'title' => $title,
+                'contact_name' => $ownerName,
+                'phone' => $ownerPhone,
+                'status' => 'Available',
+                'value' => $price,
+                'custom_data' => [
+                    'property_code' => $code,
+                    'property_title' => $title,
+                    'property_type' => $propertyType,
+                    'listing_type' => $listingType,
+                    'price' => $price,
+                    'bedrooms' => $bedrooms,
+                    'carpet_area_sqft' => $area,
+                    'locality' => $locality,
+                    'city' => $city,
+                    'owner_name' => $ownerName,
+                    'owner_phone' => $ownerPhone,
+                ],
             ]);
 
             $importedCount++;

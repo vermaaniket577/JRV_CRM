@@ -1,6 +1,6 @@
 <script setup>
-import { ref } from 'vue';
-import { useForm, Head, Link } from '@inertiajs/vue3';
+import { ref, onMounted } from 'vue';
+import { useForm, Head, Link, usePage } from '@inertiajs/vue3';
 import Loader from '@/Components/Loader.vue';
 import { 
   EyeIcon, 
@@ -10,20 +10,32 @@ import {
   EnvelopeIcon, 
   SparklesIcon,
   KeyIcon,
-  ArrowRightIcon
+  ArrowRightIcon,
+  ClockIcon
 } from '@heroicons/vue/24/outline';
 
+const page = usePage();
 const props = defineProps({
   demoCredentials: Object,
   errors: Object,
 });
 
 const showPassword = ref(false);
+const isInactivityTimeout = ref(false);
 
 const form = useForm({
   email: props.demoCredentials?.email || 'admin@jrvcrm.com',
   password: props.demoCredentials?.password || 'admin123',
   remember: true,
+});
+
+onMounted(() => {
+  const urlParams = new URLSearchParams(window.location.search);
+  const isTimeout = urlParams.get('timeout') === '1' || sessionStorage.getItem('crm_logout_reason') === 'inactivity' || Boolean(page.props.flash?.info);
+  if (isTimeout) {
+    isInactivityTimeout.value = true;
+    sessionStorage.removeItem('crm_logout_reason');
+  }
 });
 
 const fillDemo = () => {
@@ -43,6 +55,22 @@ const submit = () => {
 
   <div class="min-h-screen bg-slate-100 flex items-center justify-center p-4 font-sans text-slate-900">
     <div class="w-full max-w-md space-y-6">
+      <!-- Inactivity Timeout Banner -->
+      <div 
+        v-if="isInactivityTimeout"
+        class="p-4 rounded-2xl bg-amber-50 border border-amber-200 shadow-sm flex items-start gap-3 transition-all"
+      >
+        <div class="p-2 bg-amber-100 text-amber-700 rounded-xl shrink-0">
+          <ClockIcon class="w-5 h-5" />
+        </div>
+        <div class="space-y-0.5 min-w-0">
+          <div class="text-sm font-semibold text-amber-900">Admin Session Expired</div>
+          <p class="text-xs text-amber-700 leading-relaxed">
+            You were automatically signed out from the Master Admin Panel due to inactivity.
+          </p>
+        </div>
+      </div>
+
       <!-- Brand & Header Icon -->
       <div class="text-center space-y-2">
         <div class="w-16 h-16 bg-red-600 rounded-3xl flex items-center justify-center text-white text-3xl font-black shadow-xl shadow-red-600/30 mx-auto transform hover:scale-105 transition-all">

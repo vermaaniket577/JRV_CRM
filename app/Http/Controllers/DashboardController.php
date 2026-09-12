@@ -14,39 +14,60 @@ class DashboardController extends Controller
 {
     public function __invoke(Request $request): Response
     {
-        $totalLeads = Contact::where('status', 'lead')->count();
-        $totalContacts = Contact::count();
-        $totalEmployees = User::where('is_super_admin', false)->count();
-        $totalPipelineValue = (float) Deal::open()->sum('value');
-        $activeDealsCount = Deal::open()->count();
+        $isSubdomain = app()->bound('is_tenant_subdomain') && app('is_tenant_subdomain');
+        $currentTenant = app()->bound('current_tenant') ? app('current_tenant') : null;
+        $tenantId = ($isSubdomain && $currentTenant) ? $currentTenant->id : (session('tenant_id') ?? $request->user()?->tenant_id);
+
+        $contactBase = Contact::query();
+        $userBase = User::where('is_super_admin', false);
+        $dealBase = Deal::query();
+        $taskBase = Task::query();
+
+        if ($tenantId) {
+            $contactBase->where('tenant_id', $tenantId);
+            $userBase->where('tenant_id', $tenantId);
+            $dealBase->where('tenant_id', $tenantId);
+            $taskBase->where('tenant_id', $tenantId);
+        } elseif ($isSubdomain) {
+            $contactBase->whereRaw('1 = 0');
+            $userBase->whereRaw('1 = 0');
+            $dealBase->whereRaw('1 = 0');
+            $taskBase->whereRaw('1 = 0');
+        }
+
+        $totalLeads = (clone $contactBase)->where('status', 'lead')->count();
+        $totalContacts = (clone $contactBase)->count();
+        $totalEmployees = (clone $userBase)->count();
+        $totalPipelineValue = (float) (clone $dealBase)->open()->sum('value');
+        $activeDealsCount = (clone $dealBase)->open()->count();
         
-        $wonDealsCount = Deal::won()->count();
-        $totalClosedDeals = Deal::whereHas('stage', fn ($q) => $q->whereIn('stage_type', ['won', 'lost']))->count();
+        $wonDealsCount = (clone $dealBase)->won()->count();
+        $totalClosedDeals = (clone $dealBase)->whereHas('stage', fn ($q) => $q->whereIn('stage_type', ['won', 'lost']))->count();
         
         $conversionRate = $totalClosedDeals > 0
             ? round(($wonDealsCount / $totalClosedDeals) * 100, 1)
             : 0.0;
 
-        $upcomingTasks = Task::with(['taskable', 'assignee'])
+        $upcomingTasks = (clone $taskBase)->with(['taskable', 'assignee'])
             ->pending()
             ->orderBy('due_at')
             ->take(5)
             ->get();
 
-        $recentDeals = Deal::with(['stage', 'company', 'contact'])
+        $recentDeals = (clone $dealBase)->with(['stage', 'company', 'contact'])
             ->latest()
             ->take(5)
             ->get();
 
         return Inertia::render('Dashboard', [
             'metrics' => [
-                'total_leads' => $totalLeads > 0 ? $totalLeads : 24,
-                'total_contacts' => $totalContacts > 0 ? $totalContacts : 142,
-                'total_employees' => $totalEmployees > 0 ? $totalEmployees : 552,
-                'active_deals_count' => $activeDealsCount > 0 ? $activeDealsCount : 2,
+                'total_leads' => $totalLeads,
+                'total_contacts' => $totalContacts,
+                'total_employees' => $totalEmployees,
+                'active_deals_count' => $activeDealsCount,
                 'pipeline_value' => '₹' . number_format($totalPipelineValue, 2),
                 'conversion_rate' => $conversionRate . '%',
-                'pending_tasks_count' => Task::pending()->count(),
+                'pending_tasks_count' => (clone $taskBase)->pending()->count(),
             ],
             'upcomingTasks' => $upcomingTasks,
             'recentDeals' => $recentDeals,

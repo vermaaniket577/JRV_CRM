@@ -119,13 +119,24 @@ class GlobalSearchController extends Controller
                 ]);
         }
 
+        $isSubdomain = app()->bound('is_tenant_subdomain') && app('is_tenant_subdomain');
+        $currentTenant = app()->bound('current_tenant') ? app('current_tenant') : null;
+        $tenantId = ($isSubdomain && $currentTenant) ? $currentTenant->id : (session('tenant_id') ?? auth()->user()?->tenant_id);
+
         // 5. Search Contacts
         if (($category === 'all' || $category === 'contacts') && Schema::hasTable('contacts')) {
-            $results['contacts'] = Contact::where(function ($q) use ($query) {
+            $contactQ = Contact::where(function ($q) use ($query) {
                     $q->where('first_name', 'like', "%{$query}%")
                       ->orWhere('last_name', 'like', "%{$query}%")
                       ->orWhere('email', 'like', "%{$query}%");
-                })
+                });
+            if ($tenantId) {
+                $contactQ->where('tenant_id', $tenantId);
+            } elseif ($isSubdomain) {
+                $contactQ->whereRaw('1 = 0');
+            }
+
+            $results['contacts'] = $contactQ
                 ->take(5)
                 ->get()
                 ->map(fn ($c) => [
@@ -138,10 +149,18 @@ class GlobalSearchController extends Controller
 
         // 6. Search Employees & Users
         if ($category === 'all' || $category === 'employees') {
-            $results['employees'] = User::where(function ($q) use ($query) {
+            $userQ = User::where('is_super_admin', false)
+                ->where(function ($q) use ($query) {
                     $q->where('name', 'like', "%{$query}%")
                       ->orWhere('email', 'like', "%{$query}%");
-                })
+                });
+            if ($tenantId) {
+                $userQ->where('tenant_id', $tenantId);
+            } elseif ($isSubdomain) {
+                $userQ->whereRaw('1 = 0');
+            }
+
+            $results['employees'] = $userQ
                 ->take(5)
                 ->get()
                 ->map(fn ($u) => [

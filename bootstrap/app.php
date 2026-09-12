@@ -18,6 +18,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'api/v1/*',
             'api/v1/integration/*',
             'embed/*',
+            'keep-alive',
         ]);
         $middleware->web(append: [
             \App\Http\Middleware\IdentifyTenantSubdomain::class,

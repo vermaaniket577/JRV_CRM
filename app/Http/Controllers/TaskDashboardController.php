@@ -68,7 +68,18 @@ class TaskDashboardController extends Controller
         }
 
         $tasks = $baseQuery->latest()->get();
-        $staffList = User::get(['id', 'name', 'email']);
+
+        $isSubdomain = app()->bound('is_tenant_subdomain') && app('is_tenant_subdomain');
+        $currentTenant = app()->bound('current_tenant') ? app('current_tenant') : null;
+        $tenantId = ($isSubdomain && $currentTenant) ? $currentTenant->id : (session('tenant_id') ?? auth()->user()?->tenant_id);
+
+        $staffQuery = User::where('is_super_admin', false);
+        if ($tenantId) {
+            $staffQuery->where('tenant_id', $tenantId);
+        } elseif ($isSubdomain) {
+            $staffQuery->whereRaw('1 = 0');
+        }
+        $staffList = $staffQuery->get(['id', 'name', 'email']);
 
         return Inertia::render('TaskDashboard', [
             'activeTab' => $activeTab,

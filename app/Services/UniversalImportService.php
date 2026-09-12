@@ -462,18 +462,36 @@ class UniversalImportService
 
         $email = $data['email'] ?? ('contact_' . Str::random(6) . '@example.com');
         $phone = $data['phone'] ?? $data['mobile'] ?? '';
+        $parts = preg_split('/\s+/', trim($name), 2);
+        $firstName = $parts[0] ?? $name;
+        $lastName = $parts[1] ?? '';
 
         Contact::updateOrCreate(
             ['email' => $email],
             [
                 'tenant_id' => $tenantId,
-                'first_name' => explode(' ', $name)[0] ?? $name,
-                'last_name' => explode(' ', $name)[1] ?? '',
+                'first_name' => $firstName,
+                'last_name' => $lastName,
                 'phone' => $phone,
-                'lifecycle_stage' => $data['stage'] ?? $data['status'] ?? 'Lead',
-                'notes' => $data['notes'] ?? $data['medical_notes'] ?? null,
+                'status' => $data['status'] ?? $data['stage'] ?? 'Active',
             ]
         );
+
+        // Also sync into crm_sales_leads for leads pipeline view
+        if (\Illuminate\Support\Facades\Schema::hasTable('crm_sales_leads')) {
+            DB::table('crm_sales_leads')->updateOrInsert(
+                ['customer_email' => $email],
+                [
+                    'customer_name' => $name,
+                    'customer_phone' => $phone,
+                    'plan_interest' => $data['plan_interest'] ?? $data['plan'] ?? 'Pro CRM',
+                    'deal_stage' => $data['stage'] ?? $data['status'] ?? 'New Lead',
+                    'deal_value' => (float)($data['deal_value'] ?? $data['value'] ?? $data['budget'] ?? 0),
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]
+            );
+        }
     }
 
     private function importEmployee(array $data, ?int $tenantId): void
@@ -512,9 +530,26 @@ class UniversalImportService
 
     private function importCrmRecord(array $data, ?int $tenantId): void
     {
+        $cName = $data['name'] ?? $data['contact_name'] ?? $data['title'] ?? $data['full_name'] ?? $data['first_name'] ?? null;
+        if (!$cName) {
+            foreach ($data as $k => $v) {
+                if (is_string($v) && strlen($v) > 1 && !in_array($k, ['id', 'email', 'phone', 'status'])) {
+                    $cName = $v;
+                    break;
+                }
+            }
+        }
+
         TenantCrmRecord::create([
             'tenant_id' => $tenantId,
-            'data' => $data,
+            'title' => $cName ?: ($data['title'] ?? 'Imported Record'),
+            'contact_name' => $cName ?: 'Imported Record',
+            'email' => $data['email'] ?? $data['client_email'] ?? null,
+            'phone' => $data['phone'] ?? $data['contact_phone'] ?? $data['mobile'] ?? null,
+            'company' => $data['company'] ?? $data['organization'] ?? null,
+            'status' => $data['status'] ?? 'New Lead',
+            'value' => (float)($data['value'] ?? $data['deal_value'] ?? $data['price'] ?? $data['amount'] ?? 0),
+            'custom_data' => $data,
         ]);
     }
 
@@ -535,14 +570,32 @@ class UniversalImportService
 
     private function importProperty(array $data, ?int $tenantId): void
     {
-        $title = $data['title'] ?? $data['property_name'] ?? ('Property #' . Str::random(4));
+        $title = $data['title'] ?? $data['property_name'] ?? $data['name'] ?? ('Property #' . Str::random(4));
+        $count = \App\Models\Property::count() + 1;
+        $propType = $data['property_type'] ?? $data['type'] ?? 'Apartment';
+        $code = 'PROP-' . strtoupper(substr(preg_replace('/[^a-zA-Z]/', '', $propType), 0, 3)) . '-' . str_pad($count, 4, '0', STR_PAD_LEFT);
+
+        $bhkRaw = $data['bedrooms'] ?? $data['bhk'] ?? 2;
+        $bedrooms = is_numeric($bhkRaw) ? (int)$bhkRaw : (preg_match('/(\d+)/', (string)$bhkRaw, $m) ? (int)$m[1] : 2);
+
         \App\Models\Property::create([
             'tenant_id' => $tenantId,
+            'property_code' => $code,
             'title' => $title,
-            'price' => (float) ($data['price'] ?? 0),
-            'type' => $data['type'] ?? 'Apartment',
-            'bhk' => $data['bhk'] ?? '3 BHK',
-            'location' => $data['location'] ?? 'City Center',
+            'listing_type' => $data['listing_type'] ?? $data['purpose'] ?? 'For Rent',
+            'property_type' => $propType,
+            'price' => (float) ($data['price'] ?? $data['rent'] ?? $data['amount'] ?? 0),
+            'security_deposit' => (float) ($data['security_deposit'] ?? $data['deposit'] ?? 0),
+            'bedrooms' => $bedrooms,
+            'bathrooms' => (int) ($data['bathrooms'] ?? 2),
+            'carpet_area_sqft' => (int) ($data['carpet_area_sqft'] ?? $data['area'] ?? 850),
+            'furnishing_status' => $data['furnishing_status'] ?? $data['furnishing'] ?? 'Semi-Furnished',
+            'locality' => $data['locality'] ?? $data['location'] ?? $data['address'] ?? 'Prime Location',
+            'city' => $data['city'] ?? 'Mumbai',
+            'state' => $data['state'] ?? 'Maharashtra',
+            'owner_name' => $data['owner_name'] ?? $data['owner'] ?? 'Property Owner',
+            'owner_phone' => $data['owner_phone'] ?? $data['phone'] ?? '+91 9800000000',
+            'owner_email' => $data['owner_email'] ?? $data['email'] ?? null,
             'status' => $data['status'] ?? 'Available',
         ]);
     }

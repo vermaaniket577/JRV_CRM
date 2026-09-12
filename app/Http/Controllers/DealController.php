@@ -25,7 +25,9 @@ class DealController extends Controller
     public function index(Request $request): Response
     {
         $user = $request->user();
-        $tenantId = session('tenant_id') ?? $user?->tenant_id ?? ($request->hasSession() ? $request->session()->get('current_tenant_id') : null);
+        $isSubdomain = app()->bound('is_tenant_subdomain') && app('is_tenant_subdomain');
+        $currentTenant = app()->bound('current_tenant') ? app('current_tenant') : null;
+        $tenantId = ($isSubdomain && $currentTenant) ? $currentTenant->id : (session('tenant_id') ?? $user?->tenant_id ?? ($request->hasSession() ? $request->session()->get('current_tenant_id') : null));
         $tenant = $tenantId ? Tenant::with(['industry', 'businessType'])->find($tenantId) : null;
         $industrySlug = $tenant?->industry?->slug ?? TenantSetting::getByKey('industry_slug', 'insurance', $tenantId);
         $industryConfig = IndustrySchemaService::getIndustryConfig($industrySlug);
@@ -40,17 +42,25 @@ class DealController extends Controller
             'id' => $pipeline->id,
             'name' => $pipeline->name,
             'is_default' => (bool) $pipeline->is_default,
-            'stages' => $pipeline->stages->map(function ($stage) {
+            'stages' => $pipeline->stages->map(function ($stage) use ($tenantId, $isSubdomain) {
+                $stageDealsQuery = $stage->deals();
+                if ($tenantId) {
+                    $stageDealsQuery->where('tenant_id', $tenantId);
+                } elseif ($isSubdomain) {
+                    $stageDealsQuery->whereRaw('1 = 0');
+                }
+                $stageDeals = $stageDealsQuery->with(['company', 'contact', 'assignee'])->latest()->get();
+
                 return [
                     'id' => $stage->id,
                     'name' => $stage->name,
                     'display_order' => $stage->display_order,
                     'win_probability' => $stage->win_probability,
                     'stage_type' => $stage->stage_type,
-                    'deals_count' => $stage->deals->count(),
-                    'stage_value' => (float) $stage->deals->sum('value'),
-                    'formatted_stage_value' => '₹' . number_format($stage->deals->sum('value'), 2),
-                    'deals' => $stage->deals->map(function ($deal) {
+                    'deals_count' => $stageDeals->count(),
+                    'stage_value' => (float) $stageDeals->sum('value'),
+                    'formatted_stage_value' => '₹' . number_format($stageDeals->sum('value'), 2),
+                    'deals' => $stageDeals->map(function ($deal) {
                         return [
                             'id' => $deal->id,
                             'title' => $deal->title,
@@ -158,7 +168,7 @@ class DealController extends Controller
 
         // If pipeline not found or has no stages, create or ensure standard pipeline
         if (!$pipeline || $pipeline->stages->isEmpty()) {
-            $pipeline = $this->createDefaultPipelineForIndustry($industrySlug);
+            $pipeline = $this->createDefaultPipelineForIndustry($industrySlug, $tenantId);
             $pipeline->load([
                 'stages' => fn ($q) => $q->orderBy('display_order'),
                 'stages.deals' => fn ($q) => $q->with(['company', 'contact', 'assignee'])->latest(),
@@ -168,7 +178,7 @@ class DealController extends Controller
         return $pipeline;
     }
 
-    private function createDefaultPipelineForIndustry(string $industrySlug): Pipeline
+    private function createDefaultPipelineForIndustry(string $industrySlug, ?int $tenantId = null): Pipeline
     {
         $pipelineData = match ($industrySlug) {
             'insurance' => [
@@ -253,6 +263,7 @@ class DealController extends Controller
         foreach ($pipelineData['starter_deals'] as $d) {
             $stage = $createdStages[$d['stage_idx']] ?? $createdStages[0];
             Deal::create([
+                'tenant_id' => $tenantId,
                 'title' => $d['title'],
                 'value' => $d['value'],
                 'currency' => 'INR',

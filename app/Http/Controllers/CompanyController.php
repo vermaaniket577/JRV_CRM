@@ -20,18 +20,20 @@ class CompanyController extends Controller
     public function index(Request $request): Response
     {
         $user = $request->user();
-        $tenantId = session('tenant_id') ?? $user?->tenant_id ?? ($request->hasSession() ? $request->session()->get('current_tenant_id') : null);
+        $isSubdomain = app()->bound('is_tenant_subdomain') && app('is_tenant_subdomain');
+        $currentTenant = app()->bound('current_tenant') ? app('current_tenant') : null;
+        $tenantId = ($isSubdomain && $currentTenant) ? $currentTenant->id : (session('tenant_id') ?? $user?->tenant_id ?? ($request->hasSession() ? $request->session()->get('current_tenant_id') : null));
         $tenant = $tenantId ? Tenant::with(['industry', 'businessType'])->find($tenantId) : null;
 
         $industrySlug = $tenant?->industry?->slug ?? TenantSetting::getByKey('industry_slug', 'insurance', $tenantId);
         $industryConfig = IndustrySchemaService::getIndustryConfig($industrySlug);
 
-        $query = Company::with(['owner', 'contacts', 'deals'])
-            ->where(function ($q) use ($tenantId) {
-                if ($tenantId) {
-                    $q->where('tenant_id', $tenantId)->orWhereNull('tenant_id');
-                }
-            });
+        $query = Company::with(['owner', 'contacts', 'deals']);
+        if ($tenantId) {
+            $query->where('tenant_id', $tenantId);
+        } elseif ($isSubdomain) {
+            $query->whereRaw('1 = 0');
+        }
 
         if ($request->filled('search')) {
             $search = $request->input('search');
@@ -46,14 +48,11 @@ class CompanyController extends Controller
         $companies = $query->latest()->get();
 
         // If table is completely empty, seed a few sector-accurate starter companies
-        if ($companies->isEmpty()) {
+        if ($companies->isEmpty() && $tenantId) {
             $this->seedStarterCompanies($tenantId, $industrySlug);
             $companies = Company::with(['owner', 'contacts', 'deals'])
-                ->where(function ($q) use ($tenantId) {
-                    if ($tenantId) {
-                        $q->where('tenant_id', $tenantId)->orWhereNull('tenant_id');
-                    }
-                })->latest()->get();
+                ->where('tenant_id', $tenantId)
+                ->latest()->get();
         }
 
         $metrics = [

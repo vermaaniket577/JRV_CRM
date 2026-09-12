@@ -59,11 +59,32 @@ class CrmSalesPanelController extends Controller
         // 4. Fetch CRM Plans
         $plans = DB::table('crm_plans')->get();
 
+        // 5. Fetch Customers List from Transactions & Tenants
+        $customers = DB::table('crm_transactions')
+            ->select(
+                'customer_name',
+                'customer_email',
+                'plan_tier',
+                'payment_status',
+                DB::raw('count(*) as orders_count'),
+                DB::raw('sum(amount) as total_spent'),
+                DB::raw('max(purchase_date) as last_activity')
+            )
+            ->groupBy('customer_name', 'customer_email', 'plan_tier', 'payment_status')
+            ->orderBy('total_spent', 'desc')
+            ->get();
+
+        $tenants = DB::table('tenants')
+            ->select('id', 'name', 'subdomain', 'status', 'created_at')
+            ->get();
+
         return Inertia::render('CrmSalesPanel/Index', [
             'stats' => $stats,
             'transactions' => $transactions,
             'leads' => $leads,
             'plans' => $plans,
+            'customers' => $customers,
+            'tenants' => $tenants,
             'filters' => [
                 'plan' => $planFilter,
                 'status' => $statusFilter,

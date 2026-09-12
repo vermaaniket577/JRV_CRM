@@ -34,23 +34,44 @@ class DataImportController extends Controller
     public function index(Request $request): Response
     {
         $user = $request->user();
-        $tenantId = session('tenant_id') ?? $user?->tenant_id ?? ($request->hasSession() ? $request->session()->get('current_tenant_id') : null);
+        $isSubdomain = app()->bound('is_tenant_subdomain') && app('is_tenant_subdomain');
+        $currentTenant = app()->bound('current_tenant') ? app('current_tenant') : null;
+        $tenantId = ($isSubdomain && $currentTenant) ? $currentTenant->id : (session('tenant_id') ?? $user?->tenant_id ?? ($request->hasSession() ? $request->session()->get('current_tenant_id') : null));
         $tenant = $tenantId ? Tenant::with(['industry', 'businessType'])->find($tenantId) : null;
 
         $industrySlug = $tenant?->industry?->slug ?? TenantSetting::getByKey('industry_slug', 'insurance', $tenantId);
         $industryConfig = IndustrySchemaService::getIndustryConfig($industrySlug);
 
-        $logs = ImportLog::where(function ($q) use ($tenantId) {
-            if ($tenantId) {
-                $q->where('tenant_id', $tenantId)->orWhereNull('tenant_id');
-            }
-        })->latest()->take(20)->get();
+        $logQuery = ImportLog::query();
+        if ($tenantId) {
+            $logQuery->where('tenant_id', $tenantId);
+        } elseif ($isSubdomain) {
+            $logQuery->whereRaw('1 = 0');
+        }
+        $logs = $logQuery->latest()->take(20)->get();
+
+        $importCount = ImportLog::query();
+        $candCount = JobApplication::query();
+        $postCount = JobPosting::query();
+        $contactCount = Contact::query();
+
+        if ($tenantId) {
+            $importCount->where('tenant_id', $tenantId);
+            $candCount->where('tenant_id', $tenantId);
+            $postCount->where('tenant_id', $tenantId);
+            $contactCount->where('tenant_id', $tenantId);
+        } elseif ($isSubdomain) {
+            $importCount->whereRaw('1 = 0');
+            $candCount->whereRaw('1 = 0');
+            $postCount->whereRaw('1 = 0');
+            $contactCount->whereRaw('1 = 0');
+        }
 
         $stats = [
-            'total_imports' => ImportLog::count(),
-            'total_candidates' => JobApplication::count(),
-            'total_vacancies' => JobPosting::count(),
-            'total_contacts' => Contact::count(),
+            'total_imports' => $importCount->count(),
+            'total_candidates' => $candCount->count(),
+            'total_vacancies' => $postCount->count(),
+            'total_contacts' => $contactCount->count(),
         ];
 
         return Inertia::render('DataImportHub', [
@@ -74,6 +95,12 @@ class DataImportController extends Controller
         $entityType = $request->input('entity_type');
         $user = $request->user();
         $tenantId = session('tenant_id') ?? $user?->tenant_id ?? ($request->hasSession() ? $request->session()->get('current_tenant_id') : null);
+        if (!$tenantId && app()->bound('current_tenant') && app('current_tenant')) {
+            $tenantId = app('current_tenant')->id;
+        }
+        if (!$tenantId) {
+            $tenantId = Tenant::where('subdomain', 'like', '%unlockrentals%')->value('id') ?? Tenant::value('id');
+        }
 
         try {
             $rows = $this->importService->parseFile($file);
@@ -100,6 +127,14 @@ class DataImportController extends Controller
         } catch (Exception $e) {
             return redirect()->back()->with('error', 'File Import Failed: ' . $e->getMessage());
         }
+    }
+
+    /**
+     * Upload and execute raw .sql Database Backup File, register schema, and populate CRM data
+     */
+    public function importSqlDump(Request $request): RedirectResponse
+    {
+        return app(\App\Http\Controllers\Tenant\TenantDatabaseManagerController::class)->uploadDatabase($request);
     }
 
     /**

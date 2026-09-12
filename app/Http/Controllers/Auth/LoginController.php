@@ -55,6 +55,10 @@ class LoginController extends Controller
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 
+        if ($request->input('reason') === 'inactivity' || $request->query('reason') === 'inactivity') {
+            return redirect('/login?timeout=1')->with('info', 'You were automatically logged out due to inactivity.');
+        }
+
         return redirect('/login');
     }
 }
