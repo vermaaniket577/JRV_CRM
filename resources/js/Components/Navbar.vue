@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { usePage, Link } from '@inertiajs/vue3';
 import GlobalSearchModal from '@/Components/GlobalSearchModal.vue';
 import FreeTrialUpgradeModal from '@/Components/FreeTrialUpgradeModal.vue';
@@ -97,14 +97,47 @@ const iconMap = {
 const emit = defineEmits(['open-search']);
 const page = usePage();
 
-const isCollapsed = ref(localStorage.getItem('sidebar_collapsed') === 'true');
+const isHovered = ref(false);
 const isUpgradeModalOpen = ref(false);
 const isSearchOpen = ref(false);
 const isLoginHistoryOpen = ref(false);
 
+// If on dynamic-crm page or if user explicitly collapsed it, collapse by default
+const isDynamicCrm = computed(() => {
+  const url = page.url || '';
+  return url.startsWith('/dynamic-crm');
+});
+
+const isCollapsed = ref(
+  (page.url && page.url.startsWith('/dynamic-crm'))
+    ? true
+    : (localStorage.getItem('sidebar_collapsed') === 'true')
+);
+
+// Always auto-collapse on dynamic-crm pages so moving mouse pointer away closes it
+watch(() => page.url, (newUrl) => {
+  if (newUrl && newUrl.startsWith('/dynamic-crm')) {
+    isCollapsed.value = true;
+  }
+}, { immediate: true });
+
+// isExpanded: whether the sidebar is currently showing full width and lists
+const isExpanded = computed(() => {
+  if (!isCollapsed.value) return true;
+  return isHovered.value;
+});
+
 const toggleCollapse = () => {
   isCollapsed.value = !isCollapsed.value;
   localStorage.setItem('sidebar_collapsed', isCollapsed.value ? 'true' : 'false');
+};
+
+const handleMouseEnter = () => {
+  isHovered.value = true;
+};
+
+const handleMouseLeave = () => {
+  isHovered.value = false;
 };
 
 const customNavList = computed(() => {
@@ -167,9 +200,11 @@ const resolveIcon = (iconName) => {
 
 <template>
   <aside 
+    @mouseenter="handleMouseEnter"
+    @mouseleave="handleMouseLeave"
     :class="[
       'fixed top-0 left-0 bottom-0 h-screen bg-white border-r border-slate-200/90 transition-all duration-300 z-40 flex flex-col justify-between p-4 select-none group/sidebar overflow-y-auto',
-      isCollapsed ? 'w-20 hover:w-64 shadow-lg' : 'w-64 shadow-xs'
+      isExpanded ? 'w-64 shadow-xl' : 'w-20 shadow-xs'
     ]"
   >
     <!-- Top Section: Logo & Navigation Items -->
@@ -188,7 +223,7 @@ const resolveIcon = (iconName) => {
           <!-- Dynamic Business Name & Sector Details -->
           <div 
             class="flex flex-col min-w-0 transition-opacity duration-200"
-            :class="[isCollapsed ? 'opacity-0 group-hover/sidebar:opacity-100 hidden group-hover/sidebar:flex' : 'opacity-100 flex']"
+            :class="[!isExpanded ? 'opacity-0 hidden' : 'opacity-100 flex']"
           >
             <span class="font-bold text-sm text-slate-900 tracking-tight truncate">
               {{ businessSettings.business_name }}
@@ -204,9 +239,9 @@ const resolveIcon = (iconName) => {
         <button
           @click="toggleCollapse"
           class="w-7 h-7 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-500 flex items-center justify-center transition-colors cursor-pointer shrink-0"
-          :title="isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'"
+          :title="isCollapsed ? 'Expand and pin sidebar' : 'Auto-close sidebar on mouse leave'"
         >
-          <ChevronRightIcon v-if="isCollapsed" class="w-4 h-4" />
+          <ChevronRightIcon v-if="!isExpanded" class="w-4 h-4" />
           <ChevronLeftIcon v-else class="w-4 h-4" />
         </button>
       </div>
@@ -217,7 +252,7 @@ const resolveIcon = (iconName) => {
         href="/onboarding"
         title="Click to switch CRM sector"
         class="block p-2 rounded-xl bg-slate-50 border border-slate-200/80 hover:bg-red-50/60 hover:border-red-200 transition group/badge"
-        :class="[isCollapsed ? 'opacity-0 group-hover/sidebar:opacity-100 hidden group-hover/sidebar:block' : 'opacity-100']"
+        :class="[!isExpanded ? 'opacity-0 hidden' : 'opacity-100 block']"
       >
         <div class="flex items-center justify-between text-xs">
           <span class="text-slate-500 font-normal group-hover/badge:text-red-600 transition-colors">Sector</span>
@@ -232,7 +267,7 @@ const resolveIcon = (iconName) => {
       <div 
         v-if="currentTenant?.subdomain"
         class="p-2 rounded-xl bg-slate-50 border border-slate-200/80 space-y-1 text-xs"
-        :class="[isCollapsed ? 'opacity-0 group-hover/sidebar:opacity-100 hidden group-hover/sidebar:block' : 'opacity-100']"
+        :class="[!isExpanded ? 'opacity-0 hidden' : 'opacity-100 block']"
       >
         <div class="flex items-center justify-between">
           <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Subdomain</span>
@@ -255,13 +290,13 @@ const resolveIcon = (iconName) => {
       >
         <div class="flex items-center gap-2">
           <MagnifyingGlassIcon class="w-4 h-4 text-slate-400 group-hover:text-red-600 transition" />
-          <span :class="[isCollapsed ? 'opacity-0 group-hover/sidebar:opacity-100 hidden group-hover/sidebar:inline' : 'opacity-100']">
+          <span :class="[!isExpanded ? 'opacity-0 hidden' : 'opacity-100 inline']">
             Search CRM...
           </span>
         </div>
         <kbd 
           class="px-1.5 py-0.5 bg-white text-slate-400 group-hover:text-red-600 text-xs font-mono font-medium rounded border border-slate-200"
-          :class="[isCollapsed ? 'opacity-0 group-hover/sidebar:opacity-100 hidden group-hover/sidebar:inline' : 'opacity-100']"
+          :class="[!isExpanded ? 'opacity-0 hidden' : 'opacity-100 inline']"
         >
           ⌘K
         </kbd>
@@ -271,7 +306,7 @@ const resolveIcon = (iconName) => {
       <nav class="space-y-1">
         <div 
           class="text-xs font-semibold text-slate-400 uppercase tracking-wider px-2.5 mb-1.5 transition-opacity duration-75"
-          :class="[isCollapsed ? 'opacity-0 group-hover/sidebar:opacity-100 hidden group-hover/sidebar:block' : 'opacity-100']"
+          :class="[!isExpanded ? 'opacity-0 hidden' : 'opacity-100 block']"
         >
           Navigation
         </div>
@@ -292,7 +327,7 @@ const resolveIcon = (iconName) => {
             <component :is="resolveIcon(item.icon)" :class="['w-4 h-4 shrink-0', isCurrentRoute(item.route) ? 'text-red-600' : 'text-slate-400']" />
             <span 
               class="truncate transition-opacity duration-75"
-              :class="[isCollapsed ? 'opacity-0 group-hover/sidebar:opacity-100 hidden group-hover/sidebar:inline' : 'opacity-100']"
+              :class="[!isExpanded ? 'opacity-0 hidden' : 'opacity-100 inline']"
             >
               {{ item.label }}
             </span>
@@ -314,7 +349,7 @@ const resolveIcon = (iconName) => {
           <CircleStackIcon :class="['w-4 h-4 shrink-0', isCurrentRoute('/tenant/crm-records') ? 'text-white' : 'text-red-600']" />
           <span 
             class="truncate font-semibold transition-opacity duration-75"
-            :class="[isCollapsed ? 'opacity-0 group-hover/sidebar:opacity-100 hidden group-hover/sidebar:inline' : 'opacity-100']"
+            :class="[!isExpanded ? 'opacity-0 hidden' : 'opacity-100 inline']"
           >
             Database Hub
           </span>
@@ -335,7 +370,7 @@ const resolveIcon = (iconName) => {
           <TableCellsIcon :class="['w-4 h-4 shrink-0', isCurrentRoute('/tenant/crm-records') ? 'text-red-600' : 'text-slate-400']" />
           <span 
             class="truncate transition-opacity duration-75"
-            :class="[isCollapsed ? 'opacity-0 group-hover/sidebar:opacity-100 hidden group-hover/sidebar:inline' : 'opacity-100']"
+            :class="[!isExpanded ? 'opacity-0 hidden' : 'opacity-100 inline']"
           >
             CRM Data
           </span>
@@ -355,7 +390,7 @@ const resolveIcon = (iconName) => {
           <SparklesIcon :class="['w-4 h-4 shrink-0', page.url && page.url.startsWith('/dynamic-crm') ? 'text-violet-600' : 'text-violet-500']" />
           <span 
             class="truncate transition-opacity duration-75"
-            :class="[isCollapsed ? 'opacity-0 group-hover/sidebar:opacity-100 hidden group-hover/sidebar:inline' : 'opacity-100']"
+            :class="[!isExpanded ? 'opacity-0 hidden' : 'opacity-100 inline']"
           >
             Dynamic CRM
           </span>
@@ -375,7 +410,7 @@ const resolveIcon = (iconName) => {
           <ArrowDownTrayIcon :class="['w-4 h-4 shrink-0', isCurrentRoute('/data-import') ? 'text-red-600' : 'text-slate-400']" />
           <span 
             class="truncate transition-opacity duration-75"
-            :class="[isCollapsed ? 'opacity-0 group-hover/sidebar:opacity-100 hidden group-hover/sidebar:inline' : 'opacity-100']"
+            :class="[!isExpanded ? 'opacity-0 hidden' : 'opacity-100 inline']"
           >
             Upload Database
           </span>
@@ -395,7 +430,7 @@ const resolveIcon = (iconName) => {
           <CreditCardIcon :class="['w-4 h-4 shrink-0', isCurrentRoute('/payment-plans') ? 'text-white' : 'text-slate-600']" />
           <span 
             class="truncate font-semibold transition-opacity duration-75"
-            :class="[isCollapsed ? 'opacity-0 group-hover/sidebar:opacity-100 hidden group-hover/sidebar:inline' : 'opacity-100']"
+            :class="[!isExpanded ? 'opacity-0 hidden' : 'opacity-100 inline']"
           >
             Payment Plans
           </span>
@@ -411,7 +446,7 @@ const resolveIcon = (iconName) => {
         @click="isUpgradeModalOpen = true"
         title="Click to view subscription upgrade plans"
         class="p-2.5 bg-slate-50 hover:bg-red-50/40 border border-slate-200 rounded-xl space-y-1.5 transition cursor-pointer group/card"
-        :class="[isCollapsed ? 'opacity-0 group-hover/sidebar:opacity-100 hidden group-hover/sidebar:block' : 'opacity-100']"
+        :class="[!isExpanded ? 'opacity-0 hidden' : 'opacity-100 block']"
       >
         <div class="flex items-center justify-between text-xs font-medium text-slate-700">
           <span class="flex items-center gap-1.5">
@@ -450,7 +485,7 @@ const resolveIcon = (iconName) => {
           <ShieldCheckIcon class="w-4 h-4 text-red-500 shrink-0" />
           <span 
             class="truncate transition-opacity duration-75"
-            :class="[isCollapsed ? 'opacity-0 group-hover/sidebar:opacity-100 hidden group-hover/sidebar:inline' : 'opacity-100']"
+            :class="[!isExpanded ? 'opacity-0 hidden' : 'opacity-100 inline']"
           >
             Master Admin
           </span>
@@ -464,7 +499,7 @@ const resolveIcon = (iconName) => {
           <RocketLaunchIcon class="w-4 h-4 text-white shrink-0" />
           <span 
             class="truncate transition-opacity duration-75"
-            :class="[isCollapsed ? 'opacity-0 group-hover/sidebar:opacity-100 hidden group-hover/sidebar:inline' : 'opacity-100']"
+            :class="[!isExpanded ? 'opacity-0 hidden' : 'opacity-100 inline']"
           >
             CRM Selling Panel
           </span>
@@ -483,14 +518,14 @@ const resolveIcon = (iconName) => {
           <ServerStackIcon class="w-4 h-4 text-purple-600 shrink-0" />
           <span 
             class="truncate transition-opacity duration-75"
-            :class="[isCollapsed ? 'opacity-0 group-hover/sidebar:opacity-100 hidden group-hover/sidebar:inline' : 'opacity-100']"
+            :class="[!isExpanded ? 'opacity-0 hidden' : 'opacity-100 inline']"
           >
             Load Balancer
           </span>
         </Link>
       </template>
 
-      <div :class="[isCollapsed ? 'hidden group-hover/sidebar:grid' : 'grid', 'grid-cols-2 gap-2']">
+      <div :class="[!isExpanded ? 'hidden' : 'grid', 'grid-cols-2 gap-2']">
         <Link 
           href="/tenant/settings/navigation"
           title="Customize Menu"
@@ -528,7 +563,7 @@ const resolveIcon = (iconName) => {
           </div>
           <div 
             class="min-w-0 transition-opacity duration-200"
-            :class="[isCollapsed ? 'opacity-0 group-hover/sidebar:opacity-100 hidden group-hover/sidebar:block' : 'opacity-100']"
+            :class="[!isExpanded ? 'opacity-0 hidden' : 'opacity-100 block']"
           >
             <div class="text-xs font-semibold text-slate-900 truncate">{{ authUser?.name || businessSettings.business_name }}</div>
             <div class="text-xs text-slate-500 font-normal truncate">{{ authUser?.email || 'Admin Workspace' }}</div>
@@ -540,12 +575,12 @@ const resolveIcon = (iconName) => {
           as="button" 
           title="Logout of Account"
           class="px-2 py-1 bg-white hover:bg-red-50 text-slate-600 hover:text-red-600 font-medium text-xs rounded-lg border border-slate-200 hover:border-red-200 transition flex items-center gap-1 shrink-0 cursor-pointer shadow-2xs"
-          :class="[isCollapsed ? 'hidden group-hover/sidebar:flex' : 'flex']"
+          :class="[!isExpanded ? 'hidden' : 'flex']"
         >
           <ArrowRightOnRectangleIcon class="w-3.5 h-3.5" />
           <span 
             class="truncate transition-opacity duration-75"
-            :class="[isCollapsed ? 'hidden group-hover/sidebar:inline' : 'inline']"
+            :class="[!isExpanded ? 'hidden' : 'inline']"
           >
             Logout
           </span>
