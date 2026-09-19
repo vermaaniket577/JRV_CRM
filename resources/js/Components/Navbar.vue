@@ -355,6 +355,49 @@ const resolveIcon = (iconName) => {
           </span>
         </Link>
 
+        <!-- Master Admin SQL Database Import & Auto-Mapping -->
+        <Link 
+          v-if="isMasterAdmin && isMasterAdminPage"
+          href="/admin/database/import"
+          title="SQL Database Import & Auto-Mapping"
+          :class="[
+            'px-3 py-2 rounded-xl text-sm font-medium transition-all flex items-center gap-3',
+            page.url && page.url.startsWith('/admin/database/import')
+              ? 'bg-red-600 text-white font-semibold shadow-xs' 
+              : 'text-slate-700 bg-slate-50/80 border border-slate-200/80 hover:bg-slate-100 hover:text-slate-900'
+          ]"
+        >
+          <CircleStackIcon :class="['w-4 h-4 shrink-0', page.url && page.url.startsWith('/admin/database/import') ? 'text-white' : 'text-red-600']" />
+          <span 
+            class="truncate font-semibold transition-opacity duration-75"
+            :class="[!isExpanded ? 'opacity-0 hidden' : 'opacity-100 inline']"
+          >
+            SQL Import & Mapping
+          </span>
+        </Link>
+
+        <!-- Master Admin Database Tables Catalog -->
+        <Link 
+          v-if="isMasterAdmin && isMasterAdminPage"
+          href="/admin/database/tables"
+          title="Database Tables Catalog"
+          :class="[
+            'px-3 py-2 rounded-xl text-sm font-medium transition-all flex items-center gap-3',
+            page.url && page.url.startsWith('/admin/database/tables')
+              ? 'bg-red-600 text-white font-semibold shadow-xs' 
+              : 'text-slate-700 bg-slate-50/80 border border-slate-200/80 hover:bg-slate-100 hover:text-slate-900'
+          ]"
+        >
+          <TableCellsIcon :class="['w-4 h-4 shrink-0', page.url && page.url.startsWith('/admin/database/tables') ? 'text-white' : 'text-sky-600']" />
+          <span 
+            class="truncate font-semibold transition-opacity duration-75"
+            :class="[!isExpanded ? 'opacity-0 hidden' : 'opacity-100 inline']"
+          >
+            Database Tables
+          </span>
+        </Link>
+
+
         <!-- CRM Data / Uploaded Records (Clean standard navigation link for User CRM) -->
         <Link 
           v-if="!isMasterAdminPage"

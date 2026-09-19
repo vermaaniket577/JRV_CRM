@@ -21,6 +21,9 @@ yarn-error.log
 !storage/framework/cache/.gitignore
 !storage/framework/sessions/.gitignore
 !storage/framework/views/.gitignore
-!storage/logs/.gitignore
 vite.config.js.timestamp-*
+/database_backups/*
+!database_backups/.gitkeep
+/scratch
+/storage/app/sql_imports/*
 

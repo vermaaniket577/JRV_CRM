@@ -41,7 +41,13 @@ use App\Http\Middleware\EnsureMasterAdmin;
 use Illuminate\Support\Facades\Route;
 
 use App\Http\Controllers\Admin\LoadBalancerController;
+use App\Http\Controllers\Admin\SqlImportController;
+use App\Http\Controllers\Admin\DatabaseSchemaController;
+use App\Http\Controllers\Admin\DatabaseMappingController;
+use App\Http\Controllers\Admin\DatabaseTableController;
+use App\Http\Controllers\Admin\ImportHistoryController;
 use App\Http\Controllers\Api\HealthCheckController;
+
 
 // Dynamic CRM Engine Controllers
 use App\Http\Controllers\DynamicCrm\DashboardController as DynamicCrmDashboardController;
@@ -95,7 +101,47 @@ Route::prefix('admin')->middleware(EnsureMasterAdmin::class)->name('admin.')->gr
     Route::get('/auto-update', [AutoUpdateController::class, 'index'])->name('auto-update.index');
     Route::get('/crm-sales-panel', [CrmSalesPanelController::class, 'index'])->name('sales-panel.index');
     Route::get('/crm-selling-panel', [CrmSellingPanelController::class, 'index'])->name('selling-panel.index');
+
+    // SQL Database Import & CRM Auto-Mapping System
+    Route::prefix('database')->name('database.')->group(function () {
+        Route::get('/import', [SqlImportController::class, 'index'])->name('import');
+        Route::post('/import/upload', [SqlImportController::class, 'upload'])->name('import.upload');
+        Route::post('/import/analyze', [SqlImportController::class, 'uploadAndAnalyze'])->name('import.analyze_direct');
+        Route::post('/import/{id}/analyze', [SqlImportController::class, 'analyze'])->name('import.analyze');
+        Route::get('/import/preview', [SqlImportController::class, 'latestPreview'])->name('import.preview_latest');
+        Route::get('/import/{id}/preview', [SqlImportController::class, 'preview'])->name('import.preview');
+        Route::post('/import/execute', [SqlImportController::class, 'executeLatest'])->name('import.execute_latest');
+        Route::post('/import/{id}/execute', [SqlImportController::class, 'execute'])->name('import.execute');
+        Route::get('/import/{id}/status', [SqlImportController::class, 'status'])->name('import.status');
+        Route::get('/import/{id}/errors/export', [SqlImportController::class, 'exportErrors'])->name('import.errors.export');
+
+        Route::get('/import/history', [ImportHistoryController::class, 'index'])->name('import.history');
+        Route::get('/import/{id}', [ImportHistoryController::class, 'show'])->name('import.show');
+        Route::post('/import/{id}/rollback', [ImportHistoryController::class, 'rollback'])->name('import.rollback');
+
+        Route::get('/mapping/{id}', [DatabaseMappingController::class, 'show'])->name('mapping.show');
+        Route::post('/mapping/{id}', [DatabaseMappingController::class, 'update'])->name('mapping.update');
+        Route::post('/schema/{id}/approve', [DatabaseSchemaController::class, 'approve'])->name('schema.approve');
+
+        Route::get('/tables', [DatabaseTableController::class, 'index'])->name('tables.index');
+        Route::get('/tables/{table}', [DatabaseTableController::class, 'show'])->name('tables.show');
+        Route::post('/tables/{table}/records', [DatabaseTableController::class, 'storeRecord'])->name('tables.store');
+        Route::put('/tables/{table}/records/{id}', [DatabaseTableController::class, 'updateRecord'])->name('tables.update');
+        Route::delete('/tables/{table}/records/{id}', [DatabaseTableController::class, 'destroyRecord'])->name('tables.destroy');
+        Route::get('/tables/{table}/export/csv', [DatabaseTableController::class, 'exportCsv'])->name('tables.export.csv');
+        Route::get('/tables/{table}/export/excel', [DatabaseTableController::class, 'exportExcel'])->name('tables.export.excel');
+    });
 });
+
+// Programmatic Database Import REST API Endpoints (Admin Authenticated)
+Route::prefix('api/admin/database')->middleware(['auth'])->group(function () {
+    Route::post('/import', [SqlImportController::class, 'upload']);
+    Route::post('/import/{id}/analyze', [SqlImportController::class, 'analyze']);
+    Route::get('/import/{id}/preview', [SqlImportController::class, 'preview']);
+    Route::post('/import/{id}/execute', [SqlImportController::class, 'execute']);
+    Route::get('/import/{id}/status', [SqlImportController::class, 'status']);
+});
+
 
 // CRM Sales & Subscriptions Control Panel Routes
 Route::prefix('crm-sales-panel')->name('crm-sales-panel.')->group(function () {

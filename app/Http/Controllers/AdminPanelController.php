@@ -70,12 +70,19 @@ class AdminPanelController extends Controller
         // 5. Fetch Subscription Plans for Master Admin Management
         $plans = DB::table('crm_plans')->orderBy('id')->get();
 
+        // 6. Fetch Database Import Statistics
+        $importLogger = app(\App\Services\ImportLoggerService::class);
+        $databaseImportSummary = $importLogger->getDashboardSummary();
+        $recentDatabaseImports = \App\Models\DatabaseImport::latest()->take(5)->get();
+
         return Inertia::render('Admin/Index', [
             'stats' => $stats,
             'leads' => $leads,
             'transactions' => $transactions,
             'industries' => $industries,
             'plans' => $plans,
+            'databaseImportSummary' => $databaseImportSummary,
+            'recentDatabaseImports' => $recentDatabaseImports,
             'filters' => [
                 'status' => $statusFilter,
                 'industry' => $industryFilter,
@@ -83,6 +90,7 @@ class AdminPanelController extends Controller
             ],
         ]);
     }
+
 
     public function storeLead(Request $request): RedirectResponse
     {

@@ -31,8 +31,11 @@ import {
   CheckBadgeIcon,
   ArrowLeftIcon,
   EllipsisVerticalIcon,
-  ServerStackIcon
+  ServerStackIcon,
+  CircleStackIcon,
+  TableCellsIcon
 } from '@heroicons/vue/24/outline';
+
 
 const goBack = () => {
   if (window.history.length > 1) {
@@ -49,7 +52,16 @@ const props = defineProps({
   industries: Array,
   plans: Array,
   filters: Object,
+  databaseImportSummary: {
+    type: Object,
+    default: () => ({})
+  },
+  recentDatabaseImports: {
+    type: Array,
+    default: () => []
+  },
 });
+
 
 const isSearchOpen = ref(false);
 const isAddLeadModalOpen = ref(false);
@@ -198,9 +210,26 @@ const getStageBadgeClass = (stage) => {
           </button>
 
           <Link 
+            href="/admin/database/import"
+            class="px-3.5 py-2 bg-red-600 hover:bg-red-700 text-white font-extrabold text-xs rounded-xl shadow-2xs flex items-center gap-1.5 transition-all cursor-pointer whitespace-nowrap"
+          >
+            <CircleStackIcon class="w-4 h-4 text-white" />
+            <span>Database Import</span>
+          </Link>
+
+          <Link 
+            href="/admin/database/tables"
+            class="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white font-extrabold text-xs rounded-xl shadow-2xs flex items-center gap-1.5 transition-all cursor-pointer whitespace-nowrap"
+          >
+            <TableCellsIcon class="w-4 h-4 text-sky-400" />
+            <span>Database Tables</span>
+          </Link>
+
+          <Link 
             href="/crm-selling-panel"
             class="px-3.5 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-extrabold text-xs rounded-xl shadow-2xs flex items-center gap-1.5 transition-all cursor-pointer whitespace-nowrap"
           >
+
             <RocketLaunchIcon class="w-4 h-4 text-red-600" />
             <span>Provisioning Panel</span>
           </Link>
@@ -303,8 +332,77 @@ const getStageBadgeClass = (stage) => {
         </div>
       </div>
 
+      <!-- Database Import & Schema Synchronization Summary Widget -->
+      <div class="bg-white border border-slate-200 rounded-3xl p-6 shadow-2xs space-y-4">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
+          <div class="space-y-0.5">
+            <div class="flex items-center gap-2">
+              <CircleStackIcon class="w-5 h-5 text-red-600" />
+              <h2 class="text-lg font-extrabold text-slate-900">Database Import & Auto-Mapping Center</h2>
+            </div>
+            <p class="text-xs text-slate-500 font-medium">Automatic schema synchronization, field auto-mapping, and transactional database imports.</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <Link
+              href="/admin/database/import"
+              class="px-3.5 py-2 bg-red-600 hover:bg-red-700 text-white font-extrabold text-xs rounded-xl flex items-center gap-1.5 shadow-2xs cursor-pointer transition-all"
+            >
+              <SparklesIcon class="w-4 h-4" />
+              <span>Import SQL File</span>
+            </Link>
+            <Link
+              href="/admin/database/tables"
+              class="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-extrabold text-xs rounded-xl flex items-center gap-1.5 transition-all"
+            >
+              <TableCellsIcon class="w-4 h-4 text-sky-600" />
+              <span>Database Tables</span>
+            </Link>
+            <Link
+              href="/admin/database/import/history"
+              class="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-extrabold text-xs rounded-xl flex items-center gap-1.5 transition-all"
+            >
+              <ClockIcon class="w-4 h-4 text-slate-600" />
+              <span>History</span>
+            </Link>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+          <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80">
+            <span class="text-[10px] font-black uppercase text-slate-400">Tables Detected</span>
+            <div class="text-xl font-black text-slate-900 mt-0.5">{{ databaseImportSummary?.tables_imported || 0 }}</div>
+          </div>
+          <div class="p-3.5 rounded-2xl bg-emerald-50/60 border border-emerald-200/80">
+            <span class="text-[10px] font-black uppercase text-emerald-700">Records Imported</span>
+            <div class="text-xl font-black text-emerald-700 mt-0.5">{{ (databaseImportSummary?.records_imported || 0).toLocaleString() }}</div>
+          </div>
+          <div class="p-3.5 rounded-2xl bg-sky-50/60 border border-sky-200/80">
+            <span class="text-[10px] font-black uppercase text-sky-700">New Records</span>
+            <div class="text-xl font-black text-sky-700 mt-0.5">{{ (databaseImportSummary?.records_inserted || 0).toLocaleString() }}</div>
+          </div>
+          <div class="p-3.5 rounded-2xl bg-amber-50/60 border border-amber-200/80">
+            <span class="text-[10px] font-black uppercase text-amber-700">Updated Records</span>
+            <div class="text-xl font-black text-amber-700 mt-0.5">{{ (databaseImportSummary?.records_updated || 0).toLocaleString() }}</div>
+          </div>
+          <div class="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80">
+            <span class="text-[10px] font-black uppercase text-slate-500">Skipped Records</span>
+            <div class="text-xl font-black text-slate-700 mt-0.5">{{ (databaseImportSummary?.records_skipped || 0).toLocaleString() }}</div>
+          </div>
+          <div class="p-3.5 rounded-2xl bg-rose-50/60 border border-rose-200/80">
+            <span class="text-[10px] font-black uppercase text-rose-700">Errors</span>
+            <div class="text-xl font-black text-rose-700 mt-0.5">{{ databaseImportSummary?.records_failed || 0 }}</div>
+          </div>
+        </div>
+
+        <div class="flex items-center justify-between text-xs text-slate-500 pt-1">
+          <span>Last Sync: <strong class="text-slate-800">{{ databaseImportSummary?.last_sync_time || 'No sync yet' }}</strong></span>
+          <span>Latest Status: <strong class="text-emerald-700 font-mono font-bold">{{ databaseImportSummary?.latest_status || 'READY' }}</strong></span>
+        </div>
+      </div>
+
       <!-- Master Admin Subscription Plans Management Card Section -->
       <div class="bg-white border border-slate-200 rounded-3xl p-6 shadow-2xs space-y-4">
+
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
           <div class="space-y-0.5">
             <div class="flex items-center gap-2">
