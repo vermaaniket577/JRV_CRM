@@ -15,23 +15,46 @@ class TenantScope implements Scope
     {
         $table = $model->getTable();
 
-        // 1. If currently in a dedicated tenant subdomain, strictly filter to current tenant
-        if (app()->bound('is_tenant_subdomain') && app('is_tenant_subdomain')) {
-            $currentTenant = app()->bound('current_tenant') ? app('current_tenant') : null;
-            $tenantId = $currentTenant?->id ?? session('tenant_id');
-            if ($tenantId) {
-                $builder->where($table . '.tenant_id', $tenantId);
-            } else {
-                $builder->whereRaw('1 = 0');
+        // 1. Super Admin global view bypass (only when on global root domain, NOT on a tenant subdomain)
+        if (auth()->check() && auth()->user()->is_super_admin && !(app()->bound('is_tenant_subdomain') && app('is_tenant_subdomain'))) {
+            if (session()->has('tenant_id')) {
+                $builder->where($table . '.tenant_id', session('tenant_id'));
             }
             return;
         }
 
-        // 2. Fallback to session or authenticated user
-        if (session()->has('tenant_id')) {
-            $builder->where($table . '.tenant_id', session('tenant_id'));
-        } elseif (auth()->check() && auth()->user()->tenant_id && !auth()->user()->is_super_admin) {
-            $builder->where($table . '.tenant_id', auth()->user()->tenant_id);
+        // 2. Resolve tenant ID from all secure contexts
+        $tenantId = null;
+
+        if (app()->bound('current_tenant') && app('current_tenant')) {
+            $tenantId = app('current_tenant')->id;
+        } elseif (session()->has('tenant_id')) {
+            $tenantId = session('tenant_id');
+        } elseif (auth()->check() && auth()->user()->tenant_id) {
+            $tenantId = auth()->user()->tenant_id;
+        } else {
+            // Check request host for subdomain
+            try {
+                $request = request();
+                if ($request) {
+                    $host = $request->getHost();
+                    $parts = explode('.', $host);
+                    if (count($parts) >= 2 && !in_array(strtolower($parts[0]), ['localhost', '127', 'www', 'admin', 'api'])) {
+                        $tenant = \App\Models\Tenant::where('subdomain', $parts[0])->orWhere('slug', $parts[0])->first();
+                        if ($tenant) {
+                            $tenantId = $tenant->id;
+                        }
+                    }
+                }
+            } catch (\Throwable $e) {}
+        }
+
+        // 3. Strict isolation enforcement
+        if ($tenantId) {
+            $builder->where($table . '.tenant_id', $tenantId);
+        } else {
+            // ZERO-LEAK PRINCIPLE: If no valid tenant context exists, block all records
+            $builder->whereRaw('1 = 0');
         }
     }
 }

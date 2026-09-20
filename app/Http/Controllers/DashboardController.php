@@ -28,7 +28,7 @@ class DashboardController extends Controller
             $userBase->where('tenant_id', $tenantId);
             $dealBase->where('tenant_id', $tenantId);
             $taskBase->where('tenant_id', $tenantId);
-        } elseif ($isSubdomain) {
+        } else {
             $contactBase->whereRaw('1 = 0');
             $userBase->whereRaw('1 = 0');
             $dealBase->whereRaw('1 = 0');

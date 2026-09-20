@@ -51,8 +51,8 @@ class TenantDatabaseService
                 'selected_columns_meta' => $selectedColumns,
             ]);
 
-            // 8. Seed initial sample records matching the selected columns
-            $this->seedSampleRecords($tenant, $selectedColumns, $dbName);
+            // 8. Clean isolated database creation with 0 dummy records (strict data privacy)
+            // $this->seedSampleRecords($tenant, $selectedColumns, $dbName);
 
             return true;
         } catch (\Throwable $e) {

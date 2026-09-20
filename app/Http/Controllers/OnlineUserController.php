@@ -39,7 +39,7 @@ class OnlineUserController extends Controller
 
         if ($tenantId) {
             $query->where('tenant_id', $tenantId);
-        } elseif ($isSubdomain) {
+        } else {
             $query->whereRaw('1 = 0');
         }
 

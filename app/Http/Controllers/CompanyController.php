@@ -31,7 +31,7 @@ class CompanyController extends Controller
         $query = Company::with(['owner', 'contacts', 'deals']);
         if ($tenantId) {
             $query->where('tenant_id', $tenantId);
-        } elseif ($isSubdomain) {
+        } else {
             $query->whereRaw('1 = 0');
         }
 

@@ -14,7 +14,9 @@ trait BelongsToTenant
 
         static::creating(function ($model) {
             if (!$model->tenant_id) {
-                if (session()->has('tenant_id')) {
+                if (app()->bound('current_tenant') && app('current_tenant')) {
+                    $model->tenant_id = app('current_tenant')->id;
+                } elseif (session()->has('tenant_id')) {
                     $model->tenant_id = session('tenant_id');
                 } elseif (auth()->check() && auth()->user()->tenant_id) {
                     $model->tenant_id = auth()->user()->tenant_id;
