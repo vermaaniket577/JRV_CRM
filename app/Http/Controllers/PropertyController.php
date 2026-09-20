@@ -28,28 +28,12 @@ class PropertyController extends Controller
             }
         }
 
-        // If main Property table has 0 rows for this tenant but dedicated database has properties, auto-sync them!
-        if ($tenantId && Property::where('tenant_id', $tenantId)->count() === 0) {
-            $tenant = $currentTenant ?: \App\Models\Tenant::find($tenantId);
-            if ($tenant && $tenant->database_name) {
-                try {
-                    $hasProps = \Illuminate\Support\Facades\DB::select("SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'properties'", [$tenant->database_name]);
-                    if (!empty($hasProps)) {
-                        $tenantProps = \Illuminate\Support\Facades\DB::select("SELECT * FROM `{$tenant->database_name}`.`properties`");
-                        $syncService = app(\App\Services\SqlDatabaseDeploymentService::class);
-                        foreach ($tenantProps as $tp) {
-                            $syncService->syncSectorEntity($tenant, (array)$tp, 'properties', $tenant->industry);
-                        }
-                    }
-                } catch (\Throwable $e) {}
-            }
-        }
-
         $query = Property::query();
 
         if ($tenantId) {
             $query->where('tenant_id', $tenantId);
-        } elseif ($isSubdomain) {
+        } elseif (!$request->user()?->is_super_admin) {
+            // Strictly isolate: never leak other users' or tenants' properties
             $query->whereRaw('1 = 0');
         }
 
@@ -265,9 +249,15 @@ class PropertyController extends Controller
         $tenantId = session('tenant_id') ?? $request->user()?->tenant_id;
         if (!$tenantId && app()->bound('current_tenant') && app('current_tenant')) {
             $tenantId = app('current_tenant')->id;
+        if (!$tenantId) {
+            $host = $request->getHost();
+            $parts = explode('.', $host);
+            if (count($parts) >= 2 && !in_array(strtolower($parts[0]), ['localhost', '127', 'www', 'admin', 'api'])) {
+                $tenantId = \App\Models\Tenant::where('subdomain', $parts[0])->orWhere('slug', $parts[0])->value('id');
+            }
         }
         if (!$tenantId) {
-            $tenantId = \App\Models\Tenant::where('subdomain', 'like', '%unlockrentals%')->value('id') ?? \App\Models\Tenant::value('id');
+            return back()->with('error', 'Cannot import: tenant context could not be identified.');
         }
 
         $file = $request->file('file');

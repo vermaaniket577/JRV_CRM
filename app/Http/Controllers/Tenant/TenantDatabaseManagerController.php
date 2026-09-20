@@ -57,9 +57,16 @@ class TenantDatabaseManagerController extends Controller
             }
         }
 
+        if (!$tenant && $request->has('tenant_id')) {
+            $tenant = Tenant::with(['industry', 'businessType'])->find($request->input('tenant_id'));
+        }
+
+        if (!$tenant && $request->user()?->is_super_admin) {
+            $tenant = Tenant::with(['industry', 'businessType'])->first();
+        }
+
         if (!$tenant) {
-            $tenant = Tenant::with(['industry', 'businessType'])->where('subdomain', 'like', '%unlockrentals%')->first() 
-                ?? Tenant::with(['industry', 'businessType'])->first();
+            abort(403, 'Tenant context required. Please access via your tenant subdomain.');
         }
 
         if ($tenant && $request->hasSession()) {

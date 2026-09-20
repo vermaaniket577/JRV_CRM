@@ -97,9 +97,15 @@ class DataImportController extends Controller
         $tenantId = session('tenant_id') ?? $user?->tenant_id ?? ($request->hasSession() ? $request->session()->get('current_tenant_id') : null);
         if (!$tenantId && app()->bound('current_tenant') && app('current_tenant')) {
             $tenantId = app('current_tenant')->id;
+        if (!$tenantId) {
+            $host = $request->getHost();
+            $parts = explode('.', $host);
+            if (count($parts) >= 2 && !in_array(strtolower($parts[0]), ['localhost', '127', 'www', 'admin', 'api'])) {
+                $tenantId = Tenant::where('subdomain', $parts[0])->orWhere('slug', $parts[0])->value('id');
+            }
         }
         if (!$tenantId) {
-            $tenantId = Tenant::where('subdomain', 'like', '%unlockrentals%')->value('id') ?? Tenant::value('id');
+            return redirect()->back()->with('error', 'Cannot import: tenant context could not be identified.');
         }
 
         try {
