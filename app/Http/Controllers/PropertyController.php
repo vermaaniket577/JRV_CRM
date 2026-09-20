@@ -249,6 +249,7 @@ class PropertyController extends Controller
         $tenantId = session('tenant_id') ?? $request->user()?->tenant_id;
         if (!$tenantId && app()->bound('current_tenant') && app('current_tenant')) {
             $tenantId = app('current_tenant')->id;
+        }
         if (!$tenantId) {
             $host = $request->getHost();
             $parts = explode('.', $host);

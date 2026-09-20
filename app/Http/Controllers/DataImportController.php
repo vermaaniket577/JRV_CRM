@@ -97,6 +97,7 @@ class DataImportController extends Controller
         $tenantId = session('tenant_id') ?? $user?->tenant_id ?? ($request->hasSession() ? $request->session()->get('current_tenant_id') : null);
         if (!$tenantId && app()->bound('current_tenant') && app('current_tenant')) {
             $tenantId = app('current_tenant')->id;
+        }
         if (!$tenantId) {
             $host = $request->getHost();
             $parts = explode('.', $host);
