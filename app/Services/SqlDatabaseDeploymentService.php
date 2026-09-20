@@ -184,9 +184,13 @@ class SqlDatabaseDeploymentService
 
         uasort($candidateTables, fn($a, $b) => $b['score'] <=> $a['score']);
 
-        $primaryTable = !empty($candidateTables)
-            ? array_key_first($candidateTables)
-            : (!empty($executedTables) ? reset($executedTables) : (Str::snake(preg_replace('/[^a-zA-Z0-9_]/', '_', $baseFileName)) ?: 'crm_leads');
+        if (!empty($candidateTables)) {
+            $primaryTable = array_key_first($candidateTables);
+        } elseif (!empty($executedTables)) {
+            $primaryTable = reset($executedTables);
+        } else {
+            $primaryTable = Str::snake(preg_replace('/[^a-zA-Z0-9_]/', '_', $baseFileName)) ?: 'crm_leads';
+        }
 
         // 4. Extract schema columns & data rows for CRM deployment
         $columnsData = [];

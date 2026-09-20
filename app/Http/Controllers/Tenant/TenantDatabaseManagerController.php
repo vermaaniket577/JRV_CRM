@@ -46,6 +46,18 @@ class TenantDatabaseManagerController extends Controller
         }
 
         if (!$tenant) {
+            $host = $request->getHost();
+            $parts = explode('.', $host);
+            if (count($parts) >= 2 && !in_array(strtolower($parts[0]), ['localhost', '127', 'www', 'admin', 'api'])) {
+                $sub = $parts[0];
+                $tenant = Tenant::with(['industry', 'businessType'])
+                    ->where('subdomain', $sub)
+                    ->orWhere('slug', $sub)
+                    ->first();
+            }
+        }
+
+        if (!$tenant) {
             $tenant = Tenant::with(['industry', 'businessType'])->where('subdomain', 'like', '%unlockrentals%')->first() 
                 ?? Tenant::with(['industry', 'businessType'])->first();
         }

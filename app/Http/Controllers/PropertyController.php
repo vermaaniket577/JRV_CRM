@@ -16,6 +16,35 @@ class PropertyController extends Controller
         $currentTenant = app()->bound('current_tenant') ? app('current_tenant') : null;
         $tenantId = ($isSubdomain && $currentTenant) ? $currentTenant->id : (session('tenant_id') ?? $request->user()?->tenant_id);
 
+        if (!$tenantId) {
+            $host = $request->getHost();
+            $parts = explode('.', $host);
+            if (count($parts) >= 2 && !in_array(strtolower($parts[0]), ['localhost', '127', 'www', 'admin', 'api'])) {
+                $tenant = \App\Models\Tenant::where('subdomain', $parts[0])->orWhere('slug', $parts[0])->first();
+                if ($tenant) {
+                    $tenantId = $tenant->id;
+                    $currentTenant = $tenant;
+                }
+            }
+        }
+
+        // If main Property table has 0 rows for this tenant but dedicated database has properties, auto-sync them!
+        if ($tenantId && Property::where('tenant_id', $tenantId)->count() === 0) {
+            $tenant = $currentTenant ?: \App\Models\Tenant::find($tenantId);
+            if ($tenant && $tenant->database_name) {
+                try {
+                    $hasProps = \Illuminate\Support\Facades\DB::select("SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = ? AND TABLE_NAME = 'properties'", [$tenant->database_name]);
+                    if (!empty($hasProps)) {
+                        $tenantProps = \Illuminate\Support\Facades\DB::select("SELECT * FROM `{$tenant->database_name}`.`properties`");
+                        $syncService = app(\App\Services\SqlDatabaseDeploymentService::class);
+                        foreach ($tenantProps as $tp) {
+                            $syncService->syncSectorEntity($tenant, (array)$tp, 'properties', $tenant->industry);
+                        }
+                    }
+                } catch (\Throwable $e) {}
+            }
+        }
+
         $query = Property::query();
 
         if ($tenantId) {
