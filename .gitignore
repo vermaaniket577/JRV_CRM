@@ -27,3 +27,6 @@ vite.config.js.timestamp-*
 /scratch
 /storage/app/sql_imports/*
 
+
+/storage/app/private/*
+!storage/app/private/.gitignore
