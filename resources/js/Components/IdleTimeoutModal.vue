@@ -102,9 +102,12 @@ const checkInactivity = () => {
   const timeoutMs = getTimeoutMs();
   if (!timeoutMs) return; // Inactivity auto-logout disabled
 
-  const storedActivity = parseInt(localStorage.getItem('crm_last_activity') || '0', 10);
-  const effectiveLastActivity = Math.max(lastRecordedActivity, storedActivity);
-  const now = Date.now();
+  const storedStr = localStorage.getItem('crm_last_activity');
+  const storedActivity = storedStr ? parseInt(storedStr, 10) : 0;
+  let effectiveLastActivity = Math.max(lastRecordedActivity || now, isNaN(storedActivity) ? 0 : storedActivity);
+  if (effectiveLastActivity > now) {
+    effectiveLastActivity = now;
+  }
   const elapsed = now - effectiveLastActivity;
 
   // If elapsed time reached timeout minus warning window, open warning modal
@@ -206,11 +209,9 @@ onMounted(() => {
   // Initialize activity timestamp
   const now = Date.now();
   lastRecordedActivity = now;
-  if (!localStorage.getItem('crm_last_activity')) {
-    try {
-      localStorage.setItem('crm_last_activity', now.toString());
-    } catch (e) {}
-  }
+  try {
+    localStorage.setItem('crm_last_activity', now.toString());
+  } catch (e) {}
 
   // Bind activity listeners
   activityEvents.forEach(evt => {
