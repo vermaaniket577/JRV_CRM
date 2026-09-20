@@ -61,90 +61,233 @@ class TenantDatabaseManagerController extends Controller
     {
         $tenant = $this->resolveCurrentTenant($request);
 
-        // Fetch columns
+        // 1. Discover all user tables in dedicated database if available
+        $availableTables = [];
+        $selectedTable = $request->query('table');
+
+        if ($tenant->database_name) {
+            $ignoreTables = [
+                'migrations', 'sessions', 'cache', 'cache_locks', 'failed_jobs', 'jobs',
+                'job_batches', 'password_reset_tokens', 'activity_logs', 'payment_logs',
+                'logs', 'seo_keywords', 'crm_column_schemas', 'otp_verifications',
+                'personal_access_tokens'
+            ];
+            try {
+                $rawTables = DB::select("SHOW TABLES IN `{$tenant->database_name}`");
+                foreach ($rawTables as $t) {
+                    $tblName = array_values((array)$t)[0];
+                    if (in_array(strtolower($tblName), $ignoreTables)) continue;
+                    $rowCount = 0;
+                    try {
+                        $rowCount = (int) (DB::select("SELECT COUNT(*) as c FROM `{$tenant->database_name}`.`{$tblName}`")[0]->c ?? 0);
+                    } catch (\Throwable $e) {}
+
+                    $availableTables[] = [
+                        'name' => $tblName,
+                        'label' => Str::title(str_replace('_', ' ', $tblName)),
+                        'count' => $rowCount,
+                    ];
+                }
+            } catch (\Throwable $e) {}
+        }
+
+        // 2. Determine default active table
+        if (!$selectedTable) {
+            $customColTable = TenantCustomColumn::where('tenant_id', $tenant->id)->value('table_name');
+            if ($customColTable && collect($availableTables)->contains('name', $customColTable)) {
+                $selectedTable = $customColTable;
+            } else {
+                $bestTbl = collect($availableTables)
+                    ->sortByDesc('count')
+                    ->first(fn($t) => !in_array($t['name'], ['districts', 'localities', 'states']));
+                $selectedTable = $bestTbl['name'] ?? 'properties';
+            }
+        }
+
+        // 3. Load or generate columns for selected table
         $columns = TenantCustomColumn::where('tenant_id', $tenant->id)
+            ->where('table_name', $selectedTable)
             ->orderBy('display_order')
             ->get();
 
-        // If no columns exist yet, initialize default presets
         if ($columns->isEmpty()) {
-            $defaultCols = $this->databaseService->getDefaultColumnsForTenant($tenant);
-            $this->databaseService->syncTenantCustomColumns($tenant, $defaultCols);
-            $columns = TenantCustomColumn::where('tenant_id', $tenant->id)
-                ->orderBy('display_order')
-                ->get();
-        }
+            if ($tenant->database_name) {
+                try {
+                    $colsFromDb = DB::select(
+                        "SELECT COLUMN_NAME, DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? ORDER BY ORDINAL_POSITION",
+                        [$tenant->database_name, $selectedTable]
+                    );
+                    $order = 0;
+                    foreach ($colsFromDb as $col) {
+                        $k = $col->COLUMN_NAME;
+                        if (in_array(strtolower($k), ['id', 'user_id', 'category_id', 'slug', 'created_at', 'updated_at', 'deleted_at', 'approved_at', 'video_path', 'latitude', 'longitude', 'password', 'remember_token', 'two_factor_secret', 'two_factor_recovery_codes', 'token'])) {
+                            continue;
+                        }
+                        $type = 'text';
+                        $kLower = strtolower($k);
+                        if (str_contains($kLower, 'price') || str_contains($kLower, 'amount') || str_contains($kLower, 'value') || str_contains($kLower, 'fee')) $type = 'currency';
+                        elseif (str_contains($kLower, 'email') || str_contains($kLower, 'mail')) $type = 'email';
+                        elseif (str_contains($kLower, 'phone') || str_contains($kLower, 'mobile')) $type = 'phone';
+                        elseif (in_array($kLower, ['bedrooms', 'bathrooms', 'area_sqft', 'age', 'count', 'rating'])) $type = 'number';
+                        elseif (in_array($kLower, ['status', 'type', 'purpose', 'furnishing', 'role', 'priority', 'deal_stage'])) $type = 'badge';
 
-        // Auto-discover any columns from custom_data not yet registered in TenantCustomColumn
-        $existingKeys = $columns->pluck('column_key')->toArray();
-        $sampleRecords = TenantCrmRecord::where('tenant_id', $tenant->id)->latest()->take(30)->get();
-        $newColsToRegister = [];
-        $maxOrder = $columns->max('display_order') ?? 0;
-
-        foreach ($sampleRecords as $sr) {
-            if (is_array($sr->custom_data)) {
-                foreach (array_keys($sr->custom_data) as $k) {
-                    if (!in_array(strtolower($k), ['id', 'created_at', 'updated_at', 'deleted_at', 'tenant_id']) && !in_array($k, $existingKeys) && !in_array($k, array_keys($newColsToRegister))) {
-                        $newColsToRegister[$k] = [
+                        TenantCustomColumn::create([
                             'tenant_id' => $tenant->id,
-                            'table_name' => 'crm_leads',
+                            'table_name' => $selectedTable,
                             'column_key' => $k,
                             'column_label' => Str::title(str_replace('_', ' ', $k)),
-                            'column_type' => str_contains(strtolower($k), 'email') ? 'email' : (str_contains(strtolower($k), 'phone') ? 'phone' : (str_contains(strtolower($k), 'price') || str_contains(strtolower($k), 'value') || str_contains(strtolower($k), 'amount') ? 'currency' : 'text')),
+                            'column_type' => $type,
                             'is_required' => false,
-                            'is_default' => false,
+                            'is_default' => true,
                             'is_visible' => true,
-                            'display_order' => ++$maxOrder,
-                        ];
+                            'display_order' => ++$order,
+                        ]);
+                    }
+                    $columns = TenantCustomColumn::where('tenant_id', $tenant->id)
+                        ->where('table_name', $selectedTable)
+                        ->orderBy('display_order')
+                        ->get();
+                } catch (\Throwable $e) {}
+            }
+
+            if ($columns->isEmpty()) {
+                $columns = TenantCustomColumn::where('tenant_id', $tenant->id)
+                    ->orderBy('display_order')
+                    ->get();
+            }
+
+            if ($columns->isEmpty()) {
+                $defaultCols = $this->databaseService->getDefaultColumnsForTenant($tenant);
+                $this->databaseService->syncTenantCustomColumns($tenant, $defaultCols);
+                $columns = TenantCustomColumn::where('tenant_id', $tenant->id)
+                    ->orderBy('display_order')
+                    ->get();
+            }
+        }
+
+        // 4. Fetch records from dedicated table if available, else from TenantCrmRecord
+        $hasDedicatedTable = false;
+        if ($tenant->database_name) {
+            try {
+                $tableCheck = DB::select(
+                    "SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ?",
+                    [$tenant->database_name, $selectedTable]
+                );
+                $hasDedicatedTable = !empty($tableCheck);
+            } catch (\Throwable $e) {}
+        }
+
+        $records = null;
+        $totalRecords = 0;
+        $totalValue = 0;
+
+        if ($hasDedicatedTable && $selectedTable !== 'crm_leads') {
+            $tableQuery = DB::table("{$tenant->database_name}.{$selectedTable}");
+
+            if ($request->filled('search')) {
+                $search = $request->search;
+                $searchableCols = $columns->pluck('column_key')->toArray();
+                if (empty($searchableCols)) {
+                    $searchableCols = ['title', 'name', 'email', 'phone', 'location', 'address', 'description'];
+                }
+                $tableQuery->where(function ($q) use ($search, $searchableCols) {
+                    $first = true;
+                    foreach ($searchableCols as $c) {
+                        try {
+                            if ($first) {
+                                $q->where($c, 'like', "%{$search}%");
+                                $first = false;
+                            } else {
+                                $q->orWhere($c, 'like', "%{$search}%");
+                            }
+                        } catch (\Throwable $e) {}
+                    }
+                });
+            }
+
+            if ($request->filled('status') && $request->status !== 'all') {
+                try {
+                    $tableQuery->where('status', $request->status);
+                } catch (\Throwable $e) {}
+            }
+
+            $rawRecords = $tableQuery->latest('id')->paginate(15)->withQueryString();
+            $totalRecords = $rawRecords->total();
+
+            $transformed = $rawRecords->getCollection()->map(function ($rec) {
+                $recArr = (array) $rec;
+                $cName = $recArr['title'] ?? $recArr['name'] ?? $recArr['contact_name'] ?? $recArr['full_name'] ?? ('Record #' . $recArr['id']);
+                $val = 0;
+                foreach ($recArr as $k => $v) {
+                    if (str_contains(strtolower($k), 'price') || str_contains(strtolower($k), 'amount') || str_contains(strtolower($k), 'value')) {
+                        if (is_numeric($v)) {
+                            $val = (float) $v;
+                            break;
+                        }
                     }
                 }
-            }
-        }
 
-        if (!empty($newColsToRegister)) {
-            foreach ($newColsToRegister as $colDef) {
-                TenantCustomColumn::create($colDef);
-            }
-            $columns = TenantCustomColumn::where('tenant_id', $tenant->id)->orderBy('display_order')->get();
-        }
-
-        // Fetch records with search & filter
-        $query = TenantCrmRecord::where('tenant_id', $tenant->id);
-
-        if ($request->filled('search')) {
-            $search = $request->search;
-            $query->where(function ($q) use ($search) {
-                $q->where('contact_name', 'like', "%{$search}%")
-                  ->orWhere('company', 'like', "%{$search}%")
-                  ->orWhere('email', 'like', "%{$search}%")
-                  ->orWhere('phone', 'like', "%{$search}%")
-                  ->orWhere('status', 'like', "%{$search}%");
+                return array_merge([
+                    'id' => $recArr['id'],
+                    'title' => $cName,
+                    'contact_name' => $cName,
+                    'email' => $recArr['email'] ?? $recArr['contact_phone'] ?? null,
+                    'phone' => $recArr['phone'] ?? $recArr['contact_phone'] ?? null,
+                    'company' => $recArr['location'] ?? $recArr['address'] ?? ($recArr['company'] ?? null),
+                    'status' => ucfirst($recArr['status'] ?? 'Active'),
+                    'value' => $val,
+                    'created_at' => isset($recArr['created_at']) ? date('M d, Y', strtotime($recArr['created_at'])) : null,
+                ], $recArr);
             });
+
+            $rawRecords->setCollection($transformed);
+            $records = $rawRecords;
+
+            try {
+                $sumRes = DB::select("SELECT SUM(price) as s FROM `{$tenant->database_name}`.`{$selectedTable}`");
+                $totalValue = (float) ($sumRes[0]->s ?? 0);
+            } catch (\Throwable $e) {}
+
+        } else {
+            // Fallback to TenantCrmRecord
+            $query = TenantCrmRecord::where('tenant_id', $tenant->id);
+
+            if ($request->filled('search')) {
+                $search = $request->search;
+                $query->where(function ($q) use ($search) {
+                    $q->where('contact_name', 'like', "%{$search}%")
+                      ->orWhere('company', 'like', "%{$search}%")
+                      ->orWhere('email', 'like', "%{$search}%")
+                      ->orWhere('phone', 'like', "%{$search}%")
+                      ->orWhere('status', 'like', "%{$search}%");
+                });
+            }
+
+            if ($request->filled('status') && $request->status !== 'all') {
+                $query->where('status', $request->status);
+            }
+
+            $records = $query->latest()->paginate(15)->withQueryString();
+            $totalRecords = $records->total();
+            $totalValue = (float) TenantCrmRecord::where('tenant_id', $tenant->id)->sum('value');
+
+            $transformedRecords = $records->getCollection()->map(function ($rec) {
+                $data = $rec->custom_data ?? [];
+                return array_merge([
+                    'id' => $rec->id,
+                    'title' => $rec->title,
+                    'contact_name' => $rec->contact_name,
+                    'email' => $rec->email,
+                    'phone' => $rec->phone,
+                    'company' => $rec->company,
+                    'status' => $rec->status,
+                    'value' => (float) $rec->value,
+                    'created_at' => $rec->created_at ? $rec->created_at->format('M d, Y') : null,
+                ], $data);
+            });
+
+            $records->setCollection($transformedRecords);
         }
-
-        if ($request->filled('status') && $request->status !== 'all') {
-            $query->where('status', $request->status);
-        }
-
-        $records = $query->latest()->paginate(15)->withQueryString();
-
-        // Transform records to flatten custom_data into row properties
-        $transformedRecords = $records->getCollection()->map(function ($rec) {
-            $data = $rec->custom_data ?? [];
-            return array_merge([
-                'id' => $rec->id,
-                'title' => $rec->title,
-                'contact_name' => $rec->contact_name,
-                'email' => $rec->email,
-                'phone' => $rec->phone,
-                'company' => $rec->company,
-                'status' => $rec->status,
-                'value' => (float) $rec->value,
-                'created_at' => $rec->created_at ? $rec->created_at->format('M d, Y') : null,
-            ], $data);
-        });
-
-        $records->setCollection($transformedRecords);
 
         // Database status check
         $dbConnected = false;
@@ -164,13 +307,13 @@ class TenantDatabaseManagerController extends Controller
             'status' => $dbConnected ? 'Connected 🟢' : ($tenant->database_status ?? 'Active'),
             'is_connected' => $dbConnected,
             'total_columns' => $columns->count(),
-            'table_name' => 'crm_leads',
+            'table_name' => $selectedTable,
             'created_at' => $tenant->database_created_at ? $tenant->database_created_at->format('M d, Y H:i') : $tenant->created_at->format('M d, Y'),
         ];
 
         $stats = [
-            'total_records' => TenantCrmRecord::where('tenant_id', $tenant->id)->count(),
-            'total_value' => '₹' . number_format(TenantCrmRecord::where('tenant_id', $tenant->id)->sum('value')),
+            'total_records' => $totalRecords,
+            'total_value' => '₹' . number_format($totalValue),
             'new_leads' => TenantCrmRecord::where('tenant_id', $tenant->id)->where('status', 'New Lead')->count(),
             'qualified' => TenantCrmRecord::where('tenant_id', $tenant->id)->where('status', 'Qualified')->count(),
             'won' => TenantCrmRecord::where('tenant_id', $tenant->id)->where('status', 'Won')->count(),
@@ -182,7 +325,9 @@ class TenantDatabaseManagerController extends Controller
             'records' => $records,
             'dbInfo' => $dbInfo,
             'stats' => $stats,
-            'filters' => $request->only(['search', 'status']),
+            'availableTables' => $availableTables,
+            'activeTable' => $selectedTable,
+            'filters' => $request->only(['search', 'status', 'table']),
         ]);
     }
 
@@ -324,14 +469,21 @@ class TenantDatabaseManagerController extends Controller
         $tenantId = session('tenant_id') ?? $user?->tenant_id;
         $tenant = Tenant::findOrFail($tenantId);
 
+        $selectedTable = $request->query('table');
+        if (!$selectedTable) {
+            $customColTable = TenantCustomColumn::where('tenant_id', $tenant->id)->value('table_name');
+            $selectedTable = $customColTable ?? 'properties';
+        }
+
         $columns = TenantCustomColumn::where('tenant_id', $tenant->id)
+            ->where(function($q) use ($selectedTable) {
+                $q->where('table_name', $selectedTable)->orWhereNull('table_name');
+            })
             ->where('is_visible', true)
             ->orderBy('display_order')
             ->get();
 
-        $records = TenantCrmRecord::where('tenant_id', $tenant->id)->latest()->get();
-
-        $fileName = "crm_records_" . strtolower($tenant->slug ?: 'export') . "_" . date('Y_m_d_His') . ".csv";
+        $fileName = "crm_" . strtolower($selectedTable) . "_" . strtolower($tenant->slug ?: 'export') . "_" . date('Y_m_d_His') . ".csv";
 
         $headers = [
             'Content-type' => 'text/csv',
@@ -340,6 +492,40 @@ class TenantDatabaseManagerController extends Controller
             'Cache-Control' => 'must-revalidate, post-check=0, pre-check=0',
             'Expires' => '0',
         ];
+
+        // Check if dedicated table exists
+        $hasDedicated = false;
+        if ($tenant->database_name) {
+            try {
+                $hasDedicated = !empty(DB::select("SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ?", [$tenant->database_name, $selectedTable]));
+            } catch (\Throwable $e) {}
+        }
+
+        if ($hasDedicated && $selectedTable !== 'crm_leads') {
+            $rows = DB::table("{$tenant->database_name}.{$selectedTable}")->latest('id')->get();
+            return response()->stream(function () use ($columns, $rows) {
+                $handle = fopen('php://output', 'w');
+                $headerRow = ['ID'];
+                foreach ($columns as $col) {
+                    $headerRow[] = $col->column_label;
+                }
+                fputcsv($handle, $headerRow);
+
+                foreach ($rows as $rowObj) {
+                    $rowArr = (array) $rowObj;
+                    $line = [$rowArr['id'] ?? ''];
+                    foreach ($columns as $col) {
+                        $val = $rowArr[$col->column_key] ?? '';
+                        if (is_array($val)) $val = implode(', ', $val);
+                        $line[] = $val;
+                    }
+                    fputcsv($handle, $line);
+                }
+                fclose($handle);
+            }, 200, $headers);
+        }
+
+        $records = TenantCrmRecord::where('tenant_id', $tenant->id)->latest()->get();
 
         return response()->stream(function () use ($columns, $records) {
             $handle = fopen('php://output', 'w');

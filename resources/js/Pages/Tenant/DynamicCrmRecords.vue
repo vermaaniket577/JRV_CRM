@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue';
-import { useForm, Head, router } from '@inertiajs/vue3';
+import { useForm, Head, router, Link } from '@inertiajs/vue3';
 import Navbar from '@/Components/Navbar.vue';
 import GlobalSearchModal from '@/Components/GlobalSearchModal.vue';
 import UploadDatabaseModal from '@/Components/UploadDatabaseModal.vue';
@@ -28,6 +28,8 @@ const props = defineProps({
   records: Object,
   dbInfo: Object,
   stats: Object,
+  availableTables: Array,
+  activeTable: String,
   filters: Object,
 });
 
@@ -38,6 +40,38 @@ const isUploadDbModalOpen = ref(false);
 const searchQuery = ref(props.filters?.search || '');
 const statusFilter = ref(props.filters?.status || 'all');
 const showOnboardingSuccess = ref(false);
+
+const currentTable = computed(() => props.activeTable || props.dbInfo?.table_name || 'properties');
+
+const activeTableLabel = computed(() => {
+  const found = (props.availableTables || []).find(t => t.name === currentTable.value);
+  if (found) return found.label;
+  return currentTable.value.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+});
+
+const topTables = computed(() => {
+  if (!props.availableTables || props.availableTables.length === 0) return [];
+  return props.availableTables.filter(t => t.count > 0 && !['districts', 'localities', 'states'].includes(t.name));
+});
+
+const otherTables = computed(() => {
+  if (!props.availableTables) return [];
+  const topNames = topTables.value.map(t => t.name);
+  return props.availableTables.filter(t => !topNames.includes(t.name));
+});
+
+const hasStatusColumn = computed(() => {
+  return (props.columns || []).some(c => c.column_key === 'status');
+});
+
+const switchTable = (tableName) => {
+  if (!tableName) return;
+  router.get('/tenant/crm-records', {
+    table: tableName,
+  }, {
+    preserveState: false,
+  });
+};
 
 onMounted(() => {
   if (typeof window !== 'undefined') {
@@ -104,6 +138,7 @@ const deleteColumn = (col) => {
 
 const applySearch = () => {
   router.get('/tenant/crm-records', {
+    table: currentTable.value,
     search: searchQuery.value,
     status: statusFilter.value,
   }, {
@@ -162,9 +197,9 @@ const filterByStatus = (status) => {
             </button>
 
             <a
-              href="/tenant/crm-records/export"
+              :href="'/tenant/crm-records/export?table=' + currentTable"
               class="px-4 py-2.5 bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 text-sm font-semibold rounded-xl flex items-center gap-2 transition shadow-2xs cursor-pointer"
-              title="Export all records with custom column headers to CSV"
+              title="Export all records from the active table to CSV"
             >
               <ArrowDownTrayIcon class="w-4 h-4 stroke-[2.5]" />
               <span>Export CSV</span>
@@ -183,7 +218,7 @@ const filterByStatus = (status) => {
               class="px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white text-sm font-bold rounded-xl shadow-md shadow-red-600/25 flex items-center gap-2 transition cursor-pointer"
             >
               <PlusIcon class="w-4 h-4 stroke-[3]" />
-              <span>+ Add Lead / Record</span>
+              <span>+ Add Record</span>
             </button>
           </div>
 
@@ -217,11 +252,11 @@ const filterByStatus = (status) => {
         <!-- Metrics Bar -->
         <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
           <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs space-y-1.5">
-            <span class="text-xs font-semibold uppercase text-slate-500 tracking-wider">Total CRM Leads</span>
+            <span class="text-xs font-semibold uppercase text-slate-500 tracking-wider">Total {{ activeTableLabel }} Records</span>
             <p class="text-2xl font-bold text-slate-900">{{ stats?.total_records || 0 }}</p>
           </div>
           <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs space-y-1.5">
-            <span class="text-xs font-semibold uppercase text-slate-500 tracking-wider">Pipeline Value</span>
+            <span class="text-xs font-semibold uppercase text-slate-500 tracking-wider">Pipeline / Table Value</span>
             <p class="text-2xl font-bold text-emerald-600">{{ stats?.total_value || '₹0' }}</p>
           </div>
           <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-xs space-y-1.5">
@@ -233,6 +268,57 @@ const filterByStatus = (status) => {
             <p class="text-sm font-bold text-emerald-700 font-mono mt-2 flex items-center gap-1.5">
               <span>●</span> {{ dbInfo?.status }}
             </p>
+          </div>
+        </div>
+
+        <!-- Database Tables Navigation Switcher -->
+        <div v-if="availableTables && availableTables.length > 0" class="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div class="flex items-center gap-2 overflow-x-auto pb-1 md:pb-0 scrollbar-thin">
+            <span class="text-xs font-bold uppercase text-slate-400 tracking-wider px-2 shrink-0 flex items-center gap-1.5">
+              <CircleStackIcon class="w-4 h-4 text-slate-500" />
+              Database Tables:
+            </span>
+
+            <button
+              v-for="tbl in topTables"
+              :key="tbl.name"
+              @click="switchTable(tbl.name)"
+              :class="[
+                'px-3.5 py-2 rounded-xl text-xs font-bold transition flex items-center gap-2 shrink-0 cursor-pointer border',
+                currentTable === tbl.name
+                  ? 'bg-slate-900 text-white border-slate-900 shadow-sm'
+                  : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100 hover:text-slate-900'
+              ]"
+            >
+              <span>{{ tbl.label }}</span>
+              <span :class="[
+                'px-2 py-0.5 rounded-full text-[11px] font-mono font-bold',
+                currentTable === tbl.name ? 'bg-slate-700 text-emerald-400' : 'bg-slate-200 text-slate-700'
+              ]">
+                {{ tbl.count }}
+              </span>
+            </button>
+          </div>
+
+          <!-- All Tables Dropdown Selection -->
+          <div class="flex items-center gap-2 shrink-0">
+            <label class="text-xs font-semibold text-slate-500 whitespace-nowrap">Switch Table:</label>
+            <select
+              :value="currentTable"
+              @change="switchTable($event.target.value)"
+              class="bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-bold text-slate-700 focus:outline-none focus:border-red-500 cursor-pointer"
+            >
+              <optgroup label="Tables with Data">
+                <option v-for="t in topTables" :key="t.name" :value="t.name">
+                  {{ t.label }} ({{ t.count }} records)
+                </option>
+              </optgroup>
+              <optgroup v-if="otherTables.length > 0" label="All Other Database Tables">
+                <option v-for="t in otherTables" :key="t.name" :value="t.name">
+                  {{ t.label }} ({{ t.count }} records)
+                </option>
+              </optgroup>
+            </select>
           </div>
         </div>
 
@@ -261,7 +347,7 @@ const filterByStatus = (status) => {
                   : 'bg-slate-50 border border-slate-200 text-slate-600 hover:bg-slate-100'
               ]"
             >
-              {{ st === 'all' ? 'All Leads' : st }}
+              {{ st === 'all' ? 'All Records' : st }}
             </button>
           </div>
         </div>
@@ -287,7 +373,7 @@ const filterByStatus = (status) => {
                       </button>
                     </div>
                   </th>
-                  <th class="py-4 px-4">Status</th>
+                  <th v-if="!hasStatusColumn" class="py-4 px-4">Status</th>
                   <th class="py-4 px-4 text-right">Created</th>
                 </tr>
               </thead>
@@ -307,24 +393,38 @@ const filterByStatus = (status) => {
                     <span v-else-if="col.column_type === 'email'" class="text-blue-600 hover:underline">
                       {{ row[col.column_key] || '—' }}
                     </span>
-                    <span v-else-if="col.column_key === 'contact_name' || col.column_key === 'name'" class="font-bold text-slate-900">
-                      {{ row[col.column_key] || row.contact_name || '—' }}
+                    <span v-else-if="col.column_key === 'contact_name' || col.column_key === 'name' || col.column_key === 'title'" class="font-bold text-slate-900">
+                      {{ row[col.column_key] || row.title || row.contact_name || row.name || '—' }}
+                    </span>
+                    <span v-else-if="col.column_type === 'badge' || col.column_key === 'status'" :class="[
+                      'px-2.5 py-1 rounded-full text-xs font-bold uppercase inline-block',
+                      String(row[col.column_key]).toLowerCase() === 'approved' || String(row[col.column_key]).toLowerCase() === 'won' || String(row[col.column_key]).toLowerCase() === 'active'
+                        ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                        : String(row[col.column_key]).toLowerCase() === 'lost' || String(row[col.column_key]).toLowerCase() === 'rejected'
+                        ? 'bg-rose-100 text-rose-800 border border-rose-300'
+                        : 'bg-amber-100 text-amber-800 border border-amber-300'
+                    ]">
+                      {{ row[col.column_key] || '—' }}
+                    </span>
+                    <span v-else-if="typeof row[col.column_key] === 'boolean' || col.column_key.startsWith('is_')">
+                      <span v-if="row[col.column_key] == 1 || row[col.column_key] === true" class="text-emerald-600 font-bold">✓ Yes</span>
+                      <span v-else class="text-slate-400">✗ No</span>
                     </span>
                     <span v-else>
-                      {{ row[col.column_key] || '—' }}
+                      {{ row[col.column_key] !== null && row[col.column_key] !== undefined && row[col.column_key] !== '' ? row[col.column_key] : '—' }}
                     </span>
                   </td>
 
-                  <!-- Status -->
-                  <td class="py-3.5 px-4">
+                  <!-- Status (only if not already an explicit column) -->
+                  <td v-if="!hasStatusColumn" class="py-3.5 px-4">
                     <span :class="[
                       'px-3 py-1 rounded-full text-xs font-bold uppercase',
-                      row.status === 'Won' ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' :
+                      row.status === 'Won' || row.status === 'Approved' ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' :
                       row.status === 'Lost' ? 'bg-rose-100 text-rose-800 border border-rose-300' :
                       row.status === 'Qualified' ? 'bg-indigo-100 text-indigo-800 border border-indigo-300' :
                       'bg-amber-100 text-amber-800 border border-amber-300'
                     ]">
-                      {{ row.status || 'New Lead' }}
+                      {{ row.status || 'Active' }}
                     </span>
                   </td>
 
@@ -335,14 +435,38 @@ const filterByStatus = (status) => {
                 </tr>
 
                 <tr v-if="!records?.data || records.data.length === 0">
-                  <td :colspan="columns.length + 3" class="py-14 text-center text-slate-400">
+                  <td :colspan="columns.length + (hasStatusColumn ? 2 : 3)" class="py-14 text-center text-slate-400">
                     <TableCellsIcon class="w-12 h-12 mx-auto mb-3 opacity-40 text-slate-500" />
-                    <p class="font-bold text-base text-slate-700">No leads / CRM records found</p>
-                    <p class="text-sm text-slate-400 mt-1">Click "+ Add Lead / Record" to insert your first data row into the dedicated database.</p>
+                    <p class="font-bold text-base text-slate-700">No records found in {{ activeTableLabel }}</p>
+                    <p class="text-sm text-slate-400 mt-1">This table is currently empty or has no matching records.</p>
                   </td>
                 </tr>
               </tbody>
             </table>
+          </div>
+
+          <!-- Pagination -->
+          <div v-if="records?.links && records.links.length > 3" class="px-6 py-4 border-t border-slate-200 flex flex-col sm:flex-row items-center justify-between gap-3 bg-slate-50/50">
+            <div class="text-xs text-slate-500 font-medium">
+              Showing <span class="font-bold text-slate-800">{{ records.from || 0 }}</span> to <span class="font-bold text-slate-800">{{ records.to || 0 }}</span> of <span class="font-bold text-slate-800">{{ records.total || 0 }}</span> records
+            </div>
+            <div class="flex items-center gap-1.5 flex-wrap">
+              <Link
+                v-for="(link, idx) in records.links"
+                :key="idx"
+                :href="link.url || '#'"
+                :class="[
+                  'px-3 py-1.5 rounded-lg text-xs font-semibold transition',
+                  link.active
+                    ? 'bg-slate-900 text-white'
+                    : link.url
+                    ? 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'
+                    : 'bg-transparent text-slate-300 cursor-not-allowed'
+                ]"
+                v-html="link.label"
+                :preserve-state="true"
+              />
+            </div>
           </div>
         </div>
 

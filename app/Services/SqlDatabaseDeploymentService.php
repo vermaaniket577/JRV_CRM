@@ -145,9 +145,48 @@ class SqlDatabaseDeploymentService
         }
 
         $baseFileName = pathinfo($originalFileName, PATHINFO_FILENAME);
-        $primaryTable = !empty($executedTables)
-            ? reset($executedTables)
-            : (Str::snake(preg_replace('/[^a-zA-Z0-9_]/', '_', $baseFileName)) ?: 'crm_leads');
+        
+        // Intelligently select the best business table that actually contains data
+        $ignoreTables = [
+            'migrations', 'sessions', 'cache', 'cache_locks', 'failed_jobs', 'jobs',
+            'job_batches', 'password_reset_tokens', 'activity_logs', 'payment_logs',
+            'logs', 'seo_keywords', 'crm_column_schemas', 'otp_verifications',
+            'personal_access_tokens', 'districts', 'localities', 'states',
+        ];
+
+        $candidateTables = [];
+        $priorityKeywords = ['propert', 'lead', 'contact', 'customer', 'client', 'member', 'user', 'inquir', 'deal', 'booking', 'listing', 'product', 'patient', 'student', 'order', 'record'];
+
+        foreach ($executedTables as $tbl) {
+            $tblLower = strtolower($tbl);
+            if (in_array($tblLower, $ignoreTables)) continue;
+
+            $rowCount = 0;
+            try {
+                $countRes = DB::select("SELECT COUNT(*) as c FROM `{$dbName}`.`{$tbl}`");
+                $rowCount = (int) ($countRes[0]->c ?? 0);
+            } catch (\Throwable $e) {}
+
+            $score = $rowCount;
+            foreach ($priorityKeywords as $weight => $kw) {
+                if (str_contains($tblLower, $kw)) {
+                    $score += 1000 + (100 - $weight);
+                    break;
+                }
+            }
+
+            $candidateTables[$tbl] = [
+                'name' => $tbl,
+                'rows' => $rowCount,
+                'score' => $score,
+            ];
+        }
+
+        uasort($candidateTables, fn($a, $b) => $b['score'] <=> $a['score']);
+
+        $primaryTable = !empty($candidateTables)
+            ? array_key_first($candidateTables)
+            : (!empty($executedTables) ? reset($executedTables) : (Str::snake(preg_replace('/[^a-zA-Z0-9_]/', '_', $baseFileName)) ?: 'crm_leads');
 
         // 4. Extract schema columns & data rows for CRM deployment
         $columnsData = [];
@@ -229,6 +268,9 @@ class SqlDatabaseDeploymentService
         // 7. Deploy records into TenantCrmRecord & Sector Entities
         $importedRowsCount = 0;
         if (!empty($importedRows)) {
+            // Clean up default dummy seed records so user sees their actual imported data
+            TenantCrmRecord::where('tenant_id', $tenant->id)->delete();
+
             foreach ($importedRows as $row) {
                 $rowArr = (array)$row;
 
